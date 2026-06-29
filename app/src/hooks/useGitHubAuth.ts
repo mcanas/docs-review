@@ -1,92 +1,45 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { GitHubUser } from '../types/github'
 import { createRestClient, fetchUser } from '../api/github-rest'
 
 const TOKEN_KEY = 'docs-review:github-token'
 
-interface DeviceCodeResponse {
-  device_code: string
-  user_code: string
-  verification_uri: string
-  expires_in: number
-  interval: number
-}
-
-interface AccessTokenResponse {
-  access_token?: string
-  error?: string
-}
-
 export type AuthState =
   | { status: 'idle' }
-  | { status: 'pending'; userCode: string; verificationUrl: string }
+  | { status: 'validating' }
   | { status: 'authenticated'; token: string; user: GitHubUser }
   | { status: 'error'; message: string }
 
-export function useGitHubAuth(clientId: string, githubApiUrl: string) {
+export function useGitHubAuth(_clientId: string, githubApiUrl: string) {
   const storedToken = localStorage.getItem(TOKEN_KEY)
-  const [state, setState] = useState<AuthState>(() => ({ status: 'idle' }))
+  const [state, setState] = useState<AuthState>({ status: 'idle' })
   const [token, setToken] = useState<string | null>(storedToken)
   const [user, setUser] = useState<GitHubUser | null>(null)
 
   const baseUrl = githubApiUrl !== 'https://api.github.com' ? githubApiUrl : undefined
-  // GHEC and github.com both use api.github.com; only GHES has a custom hostname with /api/v3
-  const authBaseUrl = githubApiUrl.endsWith('/api/v3')
-    ? githubApiUrl.slice(0, -7)
-    : 'https://github.com'
 
-  const initAuth = useCallback(async () => {
-    setState({ status: 'idle' })
-
-    const deviceRes = await fetch(`${authBaseUrl}/login/device/code`, {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: clientId, scope: 'repo' }),
-    })
-    const deviceData: DeviceCodeResponse = await deviceRes.json()
-
-    setState({
-      status: 'pending',
-      userCode: deviceData.user_code,
-      verificationUrl: deviceData.verification_uri,
-    })
-
-    const pollingInterval = Math.max(deviceData.interval, 5) * 1000
-    const expiresAt = Date.now() + deviceData.expires_in * 1000
-
-    const poll = async () => {
-      if (Date.now() > expiresAt) {
-        setState({ status: 'error', message: 'Authorization timed out. Please try again.' })
-        return
-      }
-
-      const tokenRes = await fetch(`${authBaseUrl}/login/oauth/access_token`, {
-        method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: clientId,
-          device_code: deviceData.device_code,
-          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        }),
-      })
-      const tokenData: AccessTokenResponse = await tokenRes.json()
-
-      if (tokenData.access_token) {
-        localStorage.setItem(TOKEN_KEY, tokenData.access_token)
-        setToken(tokenData.access_token)
-        const client = createRestClient(tokenData.access_token, baseUrl)
-        const fetchedUser = await fetchUser(client)
-        setUser(fetchedUser)
-        setState({ status: 'authenticated', token: tokenData.access_token, user: fetchedUser })
-      } else if (tokenData.error === 'authorization_pending' || tokenData.error === 'slow_down') {
-        setTimeout(poll, pollingInterval)
-      } else {
-        setState({ status: 'error', message: tokenData.error ?? 'Authorization failed' })
-      }
+  const initAuth = useCallback(async (pat?: string) => {
+    const tokenToUse = pat ?? storedToken
+    if (!tokenToUse) {
+      setState({ status: 'idle' })
+      return
     }
+    setState({ status: 'validating' })
+    try {
+      const client = createRestClient(tokenToUse, baseUrl)
+      const fetchedUser = await fetchUser(client)
+      localStorage.setItem(TOKEN_KEY, tokenToUse)
+      setToken(tokenToUse)
+      setUser(fetchedUser)
+      setState({ status: 'authenticated', token: tokenToUse, user: fetchedUser })
+    } catch {
+      setState({ status: 'error', message: 'Invalid token or insufficient permissions. Make sure the token has repo scope.' })
+    }
+  }, [githubApiUrl, baseUrl, storedToken])
 
-    setTimeout(poll, pollingInterval)
-  }, [clientId, githubApiUrl, baseUrl])
+  useEffect(() => {
+    if (storedToken) initAuth(storedToken)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const signOut = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)

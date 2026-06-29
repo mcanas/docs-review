@@ -7,7 +7,7 @@ interface AuthContextValue {
   token: string | null
   user: GitHubUser | null
   isAuthenticated: boolean
-  initAuth: () => Promise<void>
+  initAuth: (pat?: string) => Promise<void>
   signOut: () => void
 }
 
