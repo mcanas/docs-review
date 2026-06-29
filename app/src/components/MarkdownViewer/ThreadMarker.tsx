@@ -4,18 +4,19 @@ import type { Thread } from '../../types/thread'
 interface Props {
   threads: Thread[]
   containerRef: React.RefObject<HTMLDivElement | null>
-  onSelect: (threadId: string) => void
-  selectedThreadId: string | null
+  onSelect: (threadIds: string[], line: number) => void
+  activeMarkerLine: number | null
 }
 
 interface Marker {
-  threadId: string
+  threadIds: string[]
+  line: number
   top: number
   count: number
   open: number
 }
 
-export function ThreadMarkerLayer({ threads, containerRef, onSelect, selectedThreadId }: Props) {
+export function ThreadMarkerLayer({ threads, containerRef, onSelect, activeMarkerLine }: Props) {
   const [markers, setMarkers] = useState<Marker[]>([])
 
   useEffect(() => {
@@ -37,7 +38,8 @@ export function ThreadMarkerLayer({ threads, containerRef, onSelect, selectedThr
       if (!el) return
       const top = el.getBoundingClientRect().top + window.scrollY - containerTop
       computed.push({
-        threadId: group[0].id,
+        threadIds: group.map((t) => t.id),
+        line,
         top,
         count: group.length,
         open: group.filter((t) => !t.closed).length,
@@ -51,10 +53,10 @@ export function ThreadMarkerLayer({ threads, containerRef, onSelect, selectedThr
     <>
       {markers.map((marker) => (
         <button
-          key={marker.threadId}
-          onClick={() => onSelect(marker.threadId)}
-          className={`absolute right-0 flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border transition-all ${
-            selectedThreadId === marker.threadId
+          key={marker.line}
+          onClick={() => onSelect(marker.threadIds, marker.line)}
+          className={`absolute right-2 flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border transition-all ${
+            activeMarkerLine === marker.line
               ? 'bg-blue-600 text-white border-blue-600'
               : marker.open > 0
               ? 'bg-white text-blue-600 border-blue-200 hover:border-blue-400'

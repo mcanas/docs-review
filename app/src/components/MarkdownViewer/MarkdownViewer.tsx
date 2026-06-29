@@ -86,6 +86,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   const [composerOpen, setComposerOpen] = useState(false)
   const [threadPanelOpen, setThreadPanelOpen] = useState(true)
+  const [lineFilter, setLineFilter] = useState<number | null>(null)
 
   const { data: fileContent, isLoading: fileLoading } = useFileContent(
     repo.owner, repo.name, filePath, token, baseUrl,
@@ -236,7 +237,21 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     if (threadId) setSelectedThreadId(prev => prev === threadId ? null : threadId)
   }, [])
 
+  const handleMarkerSelect = useCallback((threadIds: string[], line: number) => {
+    if (threadIds.length === 1) {
+      setSelectedThreadId((prev) => (prev === threadIds[0] ? null : threadIds[0]))
+      setLineFilter(null)
+    } else {
+      setLineFilter((prev) => (prev === line ? null : line))
+      setSelectedThreadId(null)
+    }
+  }, [])
+
   const selectedThread = threads.find((t) => t.id === selectedThreadId) ?? null
+  const activeMarkerLine = selectedThread ? selectedThread.coordinates.startLine : lineFilter
+  const visibleThreads = lineFilter !== null
+    ? threads.filter((t) => t.coordinates.startLine === lineFilter)
+    : threads
 
   if (fileLoading) {
     return (
@@ -271,8 +286,8 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
           <ThreadMarkerLayer
             threads={threads}
             containerRef={containerRef}
-            onSelect={(id) => setSelectedThreadId((prev) => prev === id ? null : id)}
-            selectedThreadId={selectedThreadId}
+            onSelect={handleMarkerSelect}
+            activeMarkerLine={activeMarkerLine}
           />
         )}
       </div>
@@ -322,12 +337,26 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
           )}
 
           {/* Thread list (when none selected) */}
-          {!selectedThread && !composerOpen && threads.length > 0 && (
+          {!selectedThread && !composerOpen && visibleThreads.length > 0 && (
             <div className="space-y-3">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                {threads.filter((t) => !t.closed).length} open · {threads.filter((t) => t.closed).length} resolved
-              </p>
-              {threads.map((t) => (
+              {lineFilter !== null ? (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                    {visibleThreads.length} {visibleThreads.length === 1 ? 'comment' : 'comments'} on this line
+                  </p>
+                  <button
+                    onClick={() => setLineFilter(null)}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    Show all
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                  {threads.filter((t) => !t.closed).length} open · {threads.filter((t) => t.closed).length} resolved
+                </p>
+              )}
+              {visibleThreads.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setSelectedThreadId(t.id)}
