@@ -5,7 +5,8 @@ import remarkGfm from 'remark-gfm'
 import remarkRehype from 'remark-rehype'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import rehypeStringify from 'rehype-stringify'
-import { createHighlighter, type HighlighterGeneric } from 'shiki'
+import { createHighlighterCore } from 'shiki/core'
+import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 import rehypeShikiFromHighlighter from '@shikijs/rehype/core'
 import { visit } from 'unist-util-visit'
 import type { Root, Element } from 'hast'
@@ -33,13 +34,31 @@ const sanitizeSchema = {
   },
 }
 
-let highlighterPromise: Promise<HighlighterGeneric<any, any>> | null = null
+// Only the langs we actually need — each is a separate dynamic import (code-split by Vite)
+const LANGS = [
+  () => import('shiki/langs/typescript.mjs'),
+  () => import('shiki/langs/javascript.mjs'),
+  () => import('shiki/langs/tsx.mjs'),
+  () => import('shiki/langs/jsx.mjs'),
+  () => import('shiki/langs/python.mjs'),
+  () => import('shiki/langs/bash.mjs'),
+  () => import('shiki/langs/yaml.mjs'),
+  () => import('shiki/langs/json.mjs'),
+  () => import('shiki/langs/sql.mjs'),
+  () => import('shiki/langs/go.mjs'),
+  () => import('shiki/langs/rust.mjs'),
+  () => import('shiki/langs/java.mjs'),
+  () => import('shiki/langs/markdown.mjs'),
+]
+
+let highlighterPromise: ReturnType<typeof createHighlighterCore> | null = null
 
 function getHighlighter() {
   if (!highlighterPromise) {
-    highlighterPromise = createHighlighter({
-      themes: ['github-light'],
-      langs: ['typescript', 'javascript', 'tsx', 'jsx', 'python', 'bash', 'sh', 'yaml', 'json', 'sql', 'go', 'rust', 'java', 'markdown', 'text'],
+    highlighterPromise = createHighlighterCore({
+      themes: [import('shiki/themes/github-light.mjs')],
+      langs: LANGS.map((fn) => fn()),
+      engine: createJavaScriptRegexEngine(),
     })
   }
   return highlighterPromise
@@ -47,7 +66,11 @@ function getHighlighter() {
 
 export async function renderMarkdown(markdown: string): Promise<string> {
   const highlighter = await getHighlighter()
-  const shikiPlugin = rehypeShikiFromHighlighter(highlighter as any, { theme: 'github-light', fallbackLanguage: 'text' })
+  const shikiPlugin = rehypeShikiFromHighlighter(highlighter as any, {
+    theme: 'github-light',
+    fallbackLanguage: 'text',
+    addLanguageClass: true,
+  })
 
   const file = await (unified() as any)
     .use(remarkParse)
