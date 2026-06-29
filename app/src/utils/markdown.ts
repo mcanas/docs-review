@@ -24,6 +24,44 @@ function rehypeLineNumbers() {
   }
 }
 
+// Converts ```mermaid blocks into <div data-mermaid="..."> placeholders before
+// rehype-sanitize runs, so the diagram source survives sanitization intact.
+function rehypeMermaidPlaceholder() {
+  return (tree: Root) => {
+    visit(tree, 'element', (node: Element, index, parent) => {
+      if (
+        node.tagName !== 'pre' ||
+        !parent ||
+        index == null
+      ) return
+
+      const code = node.children.find(
+        (c): c is Element =>
+          c.type === 'element' &&
+          c.tagName === 'code' &&
+          String(c.properties?.className ?? '').includes('language-mermaid'),
+      )
+      if (!code) return
+
+      const source = code.children
+        .filter((c) => c.type === 'text')
+        .map((c) => (c as { value: string }).value)
+        .join('')
+
+      // Replace the <pre> with a placeholder <div> that survives sanitization
+      ;(parent.children as Element[])[index] = {
+        type: 'element',
+        tagName: 'div',
+        properties: {
+          className: ['mermaid-pending'],
+          dataMermaid: btoa(unescape(encodeURIComponent(source))),
+        },
+        children: [],
+      }
+    })
+  }
+}
+
 const sanitizeSchema = {
   ...defaultSchema,
   attributes: {
@@ -31,6 +69,7 @@ const sanitizeSchema = {
     '*': [...(defaultSchema.attributes?.['*'] ?? []), /^data-/],
     code: [...(defaultSchema.attributes?.['code'] ?? []), 'className'],
     span: [...(defaultSchema.attributes?.['span'] ?? []), 'className', 'style'],
+    div: [...(defaultSchema.attributes?.['div'] ?? []), 'className', 'dataMermaid'],
   },
 }
 
@@ -77,6 +116,7 @@ export async function renderMarkdown(markdown: string): Promise<string> {
     .use(remarkGfm)
     .use(remarkRehype, { allowDangerousHtml: false })
     .use(rehypeLineNumbers)
+    .use(rehypeMermaidPlaceholder)
     .use(shikiPlugin)
     .use(rehypeSanitize, sanitizeSchema)
     .use(rehypeStringify)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useBuildConfig } from '../../contexts/ConfigContext'
 import { useFileContent } from '../../hooks/useFileContent'
@@ -51,6 +51,33 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     setSourceLines(lines)
     renderMarkdown(fileContent.content).then(setRenderedHtml)
   }, [fileContent])
+
+  // After each HTML update, hydrate any mermaid placeholder divs into SVGs.
+  // Mermaid is lazy-imported so it doesn't land in the initial bundle.
+  useLayoutEffect(() => {
+    if (!renderedHtml || !containerRef.current) return
+    const placeholders = containerRef.current.querySelectorAll<HTMLElement>('.mermaid-pending')
+    if (!placeholders.length) return
+
+    import('mermaid').then(({ default: mermaid }) => {
+      mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
+      placeholders.forEach(async (el, i) => {
+        const encoded = el.getAttribute('data-mermaid')
+        if (!encoded) return
+        try {
+          const source = decodeURIComponent(escape(atob(encoded)))
+          const id = `mermaid-diagram-${i}`
+          const { svg } = await mermaid.render(id, source)
+          el.innerHTML = svg
+          el.classList.remove('mermaid-pending')
+        } catch (err) {
+          el.textContent = `Diagram error: ${err instanceof Error ? err.message : String(err)}`
+          el.classList.add('text-red-500', 'text-sm', 'font-mono', 'p-3', 'bg-red-50', 'rounded')
+          el.classList.remove('mermaid-pending')
+        }
+      })
+    })
+  }, [renderedHtml])
 
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection()
