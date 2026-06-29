@@ -174,24 +174,17 @@ export async function fetchOrCreateDocReviewCategory(
     repository: { id: string; discussionCategories: { nodes: Array<{ id: string; name: string }> } }
   }>(query, { owner, repo })
 
-  const existing = result.repository.discussionCategories.nodes.find((c) => c.name === '📝 Doc Reviews')
-  if (existing) {
-    return { repositoryId: result.repository.id, categoryId: existing.id }
+  const categories = result.repository.discussionCategories.nodes
+  const category =
+    categories.find((c) => c.name === '📝 Doc Reviews') ??
+    categories.find((c) => c.name.toLowerCase().includes('general')) ??
+    categories[0]
+
+  if (!category) {
+    throw new Error(
+      'No discussion categories found. Enable Discussions on the repository and create a category (e.g. "General") in the GitHub settings UI.',
+    )
   }
 
-  const createMutation = `
-    mutation($input: CreateDiscussionCategoryInput!) {
-      createDiscussionCategory(input: $input) { discussionCategory { id } }
-    }
-  `
-  const created = await client<{
-    createDiscussionCategory: { discussionCategory: { id: string } }
-  }>(createMutation, {
-    input: { repositoryId: result.repository.id, name: '📝 Doc Reviews', emoji: ':memo:', description: 'Doc review threads managed by docs-review' },
-  })
-
-  return {
-    repositoryId: result.repository.id,
-    categoryId: created.createDiscussionCategory.discussionCategory.id,
-  }
+  return { repositoryId: result.repository.id, categoryId: category.id }
 }
