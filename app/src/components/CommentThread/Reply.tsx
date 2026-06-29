@@ -1,4 +1,5 @@
 import type { ThreadReply } from '../../types/thread'
+import { MarkdownBody } from '../MarkdownBody'
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -24,10 +25,7 @@ export function Reply({ reply }: { reply: ThreadReply }) {
           <span className="text-sm font-medium text-gray-900">{reply.author.login}</span>
           <span className="text-xs text-gray-400">{relativeTime(reply.createdAt)}</span>
         </div>
-        <div
-          className="text-sm text-gray-700 prose prose-sm max-w-none"
-          dangerouslySetInnerHTML={{ __html: reply.body }}
-        />
+        <MarkdownBody markdown={reply.body} className="text-sm text-gray-700 prose prose-sm max-w-none" />
       </div>
     </div>
   )

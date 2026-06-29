@@ -3,6 +3,8 @@ import type { Thread as ThreadType } from '../../types/thread'
 import { Reply } from './Reply'
 import { ThreadComposer } from './ThreadComposer'
 import { useAuth } from '../../contexts/AuthContext'
+import { MarkdownBody } from '../MarkdownBody'
+import { extractCommentBody } from '../../utils/discussion'
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
@@ -74,15 +76,9 @@ export function Thread({ thread, isOutdated, onReply, onResolve, onReopen }: Pro
                 <span className="text-xs text-green-600 font-medium">Resolved</span>
               )}
             </div>
-            {/* Strip metadata block from displayed body */}
-            <div
+            <MarkdownBody
+              markdown={extractCommentBody(thread.body)}
               className="text-sm text-gray-700 prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{
-                __html: thread.body
-                  .replace(/<!-- docs-review-meta[\s\S]*?-->/, '')
-                  .replace(/^(>.*\n?)+/, '')
-                  .trim(),
-              }}
             />
           </div>
         </div>

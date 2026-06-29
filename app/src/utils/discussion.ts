@@ -24,6 +24,13 @@ export function buildDiscussionTitle(file: string, startLine: number, endLine: n
   return `[doc-review] ${file}:${startLine}-${endLine}`
 }
 
+export function extractCommentBody(rawBody: string): string {
+  return rawBody
+    .replace(/<!-- docs-review-meta[\s\S]*?-->/, '')
+    .replace(/^(>.*\n?)+\n?/, '')
+    .trim()
+}
+
 export function buildDiscussionBody(coords: ThreadCoordinates, openingComment: string): string {
   const quote = coords.selectedText
     .split('\n')

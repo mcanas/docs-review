@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { DeviceFlowModal } from '../Auth/DeviceFlowModal'
+import { MarkdownBody } from '../MarkdownBody'
 
 interface Props {
   onSubmit: (body: string) => Promise<void>
@@ -47,10 +48,9 @@ export function ThreadComposer({ onSubmit, onCancel, placeholder = 'Add a commen
         </div>
 
         {preview ? (
-          <div
-            className="min-h-[80px] p-3 text-sm prose prose-sm max-w-none text-gray-700"
-            dangerouslySetInnerHTML={{ __html: body || '<span class="text-gray-400">Nothing to preview</span>' }}
-          />
+          body
+            ? <MarkdownBody markdown={body} className="min-h-[80px] p-3 text-sm prose prose-sm max-w-none text-gray-700" />
+            : <div className="min-h-[80px] p-3 text-sm text-gray-400">Nothing to preview</div>
         ) : (
           <textarea
             value={body}
