@@ -7,10 +7,10 @@ A GitHub-native markdown documentation review platform that replicates Confluenc
 **Target users:** Engineering teams practicing spec-driven development on GitHub Enterprise who need collaborative review workflows for BRDs, URSs, technical designs, and other markdown documentation stored in a shared repo.
 
 **Success criteria:**
-- Any contributor can comment on a specific line or range of lines in a markdown doc
+- Any contributor — including non-technical stakeholders — can highlight text in a rendered document and add a comment
 - Comments are threaded, resolvable, and persisted as GitHub Discussions
 - Authors receive notifications via GitHub's native notification system
-- The interface is accessible to all org members who have repo access
+- The interface is accessible to all org members who have repo access, with no knowledge of markdown or git required to read and comment
 - Zero external service dependencies beyond GitHub itself
 
 ---
@@ -57,20 +57,24 @@ Comments are stored as **GitHub Discussions** in the target repo:
 
 ### Git Coordinate Model
 
-Each comment thread captures the line coordinates at time of posting:
+Each comment thread anchors to the selected text at the time of posting. Line numbers are an internal anchoring mechanism only — they are never exposed to the user.
 
 ```json
 {
   "project": "Platform Core",
   "file": "projects/platform/docs/design.md",
+  "selectedText": "the exact text the reviewer highlighted",
+  "sectionContext": "## Authentication Flow",
   "startLine": 42,
   "endLine": 44,
-  "commitSha": "abc123def456...",
-  "lineContent": "the exact text of the commented line(s)"
+  "commitSha": "abc123def456..."
 }
 ```
 
-Threads are displayed inline relative to the current file. If the current HEAD `commitSha` differs from the thread's recorded `commitSha`, the thread is marked **Outdated** with the original line content shown as a quote.
+- `selectedText` is shown as a block quote in the thread to give context
+- `sectionContext` is the nearest preceding heading — used when showing outdated threads
+- `startLine` / `endLine` are used internally to re-anchor the highlight when re-rendering the document; never displayed
+- If the current HEAD `commitSha` differs from the thread's recorded `commitSha`, the thread is marked **Outdated** and the original `selectedText` is shown as a greyed quote
 
 ---
 
@@ -135,20 +139,23 @@ settings:
 
 ## 4. Core Features
 
-### F1 — Markdown Viewer
-- Render markdown with a line-number gutter on the left
+### F1 — Rendered Document Viewer
+- Display documents as polished rendered HTML — no markdown source, no line numbers visible
 - Full GFM support: tables, task lists, strikethrough, footnotes
 - Syntax highlighting for fenced code blocks (via Shiki)
-- Frontmatter rendered as a collapsible metadata panel
-- Hover on any line reveals a comment affordance (➕ icon in gutter)
+- Frontmatter rendered as a collapsible document metadata panel (title, author, date, status)
+- Paragraphs and sections that have open threads show a subtle comment bubble (💬 N) in the right margin
+- The overall visual target is a clean reading experience comparable to Confluence or Notion
 
 ### F2 — Inline Comment Threads
-- Click the ➕ gutter icon to open a thread composer anchored to that line
-- Click-drag across consecutive line numbers to select a multi-line range
+- Reviewer selects/highlights any text in the rendered document with their cursor
+- A floating **"Add comment"** button appears near the selection (tooltip-style)
+- Clicking it opens a thread composer anchored to the highlighted text
+- The highlighted text is preserved with a subtle background tint in the document
 - Thread composer: markdown input with live preview tab
 - Submitting requires authentication — triggers Device Flow prompt if unauthenticated
-- After posting, thread anchor renders inline directly below the commented line(s)
-- Thread is collapsed by default; click to expand
+- After posting, a comment bubble appears in the right margin beside the highlighted passage; clicking it expands the thread inline
+- Thread is collapsed by default; click the margin bubble or the highlighted text to expand
 
 ### F3 — Threaded Replies
 - Expanding a thread shows all replies in chronological order
@@ -205,8 +212,9 @@ docs-review/                         ← this repository
 │   │   │   │   └── FileTree.tsx
 │   │   │   ├── MarkdownViewer/
 │   │   │   │   ├── MarkdownViewer.tsx
-│   │   │   │   ├── LineGutter.tsx
-│   │   │   │   └── ThreadAnchor.tsx
+│   │   │   │   ├── SelectionPopover.tsx  ← floating "Add comment" button on text selection
+│   │   │   │   ├── ThreadMarker.tsx      ← right-margin comment bubble
+│   │   │   │   └── ThreadAnchor.tsx      ← highlight tint + inline expanded thread
 │   │   │   ├── CommentThread/
 │   │   │   │   ├── Thread.tsx
 │   │   │   │   ├── ThreadComposer.tsx
@@ -227,7 +235,7 @@ docs-review/                         ← this repository
 │   │   │   ├── thread.ts
 │   │   │   └── github.ts
 │   │   └── utils/
-│   │       ├── coordinate.ts        ← line coordinate mapping utilities
+│   │       ├── coordinate.ts        ← maps DOM text selection ranges to source line numbers
 │   │       └── discussion.ts        ← Discussion metadata serialization
 │   ├── index.html
 │   ├── vite.config.ts
