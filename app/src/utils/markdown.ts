@@ -96,7 +96,7 @@ let highlighterPromise: ReturnType<typeof createHighlighterCore> | null = null
 function getHighlighter() {
   if (!highlighterPromise) {
     highlighterPromise = createHighlighterCore({
-      themes: [import('shiki/themes/github-light.mjs')],
+      themes: [import('shiki/themes/github-dark.mjs')],
       langs: LANGS.map((fn) => fn()),
       engine: createJavaScriptRegexEngine(),
     })
@@ -107,7 +107,7 @@ function getHighlighter() {
 export async function renderMarkdown(markdown: string): Promise<string> {
   const highlighter = await getHighlighter()
   const shikiPlugin = rehypeShikiFromHighlighter(highlighter as any, {
-    theme: 'github-light',
+    theme: 'github-dark',
     fallbackLanguage: 'text',
     addLanguageClass: true,
   })
