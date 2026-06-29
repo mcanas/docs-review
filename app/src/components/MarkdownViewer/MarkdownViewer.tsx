@@ -145,7 +145,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
 
     const container = containerRef.current
     const dataLineCount = container.querySelectorAll('[data-line]').length
-    console.debug('[docs-review] mark effect: threads=%d data-line-els=%d', threads.length, dataLineCount)
+    console.log('[docs-review] mark effect: threads=%d data-line-els=%d', threads.length, dataLineCount)
 
     // Clear all injected marks, restoring plain text nodes.
     container
@@ -157,7 +157,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     // element can't be found (e.g. threads created before data-line fix).
     threads.forEach((t: ThreadType) => {
       const lineEl = container.querySelector(`[data-line="${t.coordinates.startLine}"]`) ?? container
-      console.debug('[docs-review] thread %s: startLine=%d lineEl=%s text=%s',
+      console.log('[docs-review] thread %s: startLine=%d lineEl=%s text=%s',
         t.id.slice(-6), t.coordinates.startLine, lineEl.tagName, t.coordinates.selectedText.slice(0, 30))
       const selected = t.id === selectedThreadId
       injectMark(
@@ -174,7 +174,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     // Pending selection highlight — shown while popover or composer is visible.
     if (pending) {
       const lineEl = container.querySelector(`[data-line="${pending.coordinates.startLine}"]`) ?? container
-      console.debug('[docs-review] pending: startLine=%d lineEl=%s text=%s',
+      console.log('[docs-review] pending: startLine=%d lineEl=%s text=%s',
         pending.coordinates.startLine, lineEl.tagName, pending.coordinates.selectedText.slice(0, 30))
       injectMark(
         lineEl,
