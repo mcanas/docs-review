@@ -21,7 +21,8 @@ export function deserializeCoordinates(body: string): ThreadCoordinates | null {
 }
 
 export function buildDiscussionTitle(file: string, startLine: number, endLine: number): string {
-  return `[doc-review] ${file}:${startLine}-${endLine}`
+  const range = startLine === endLine ? `${startLine}` : `${startLine}-${endLine}`
+  return `[doc-review] ${file}:${range}`
 }
 
 export function extractCommentBody(rawBody: string): string {
