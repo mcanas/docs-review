@@ -116,32 +116,28 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
   useLayoutEffect(() => {
     if (!renderedHtml || !containerRef.current) return
     const placeholders = containerRef.current.querySelectorAll<HTMLElement>('.mermaid-pending')
-    console.log('[docs-review] mermaid: found', placeholders.length, 'placeholder(s)')
     if (!placeholders.length) return
 
     import('mermaid').then(({ default: mermaid }) => {
       mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
       placeholders.forEach(async (el, i) => {
         const encoded = el.getAttribute('data-mermaid')
-        console.log('[docs-review] mermaid[%d]: encoded=%s', i, encoded ? encoded.slice(0, 20) + '…' : 'null')
         if (!encoded) return
         try {
-          const source = decodeURIComponent(escape(atob(encoded)))
-          console.log('[docs-review] mermaid[%d]: source=%s', i, source.slice(0, 60))
+          // TextDecoder handles the full UTF-8 range safely (escape() is deprecated)
+          const source = new TextDecoder().decode(Uint8Array.from(atob(encoded), c => c.charCodeAt(0)))
           const id = `mermaid-diagram-${i}`
           const { svg, bindFunctions } = await mermaid.render(id, source)
           el.innerHTML = svg
           bindFunctions?.(el)
           el.classList.remove('mermaid-pending')
-          console.log('[docs-review] mermaid[%d]: rendered OK', i)
         } catch (err) {
-          console.error('[docs-review] mermaid[%d]: error', i, err)
           el.textContent = `Diagram error: ${err instanceof Error ? err.message : String(err)}`
           el.classList.add('text-red-500', 'text-sm', 'font-mono', 'p-3', 'bg-red-50', 'rounded')
           el.classList.remove('mermaid-pending')
         }
       })
-    }).catch((err) => console.error('[docs-review] mermaid: import failed', err))
+    }).catch((err) => console.error('[docs-review] mermaid import failed:', err))
   }, [renderedHtml])
 
   // Inject <mark> highlights for threads and pending selection.
@@ -150,8 +146,6 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     if (!containerRef.current) return
 
     const container = containerRef.current
-    const dataLineCount = container.querySelectorAll('[data-line]').length
-    console.log('[docs-review] mark effect: threads=%d data-line-els=%d', threads.length, dataLineCount)
 
     // Clear all injected marks, restoring plain text nodes.
     container
@@ -163,8 +157,6 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     // element can't be found (e.g. threads created before data-line fix).
     threads.forEach((t: ThreadType) => {
       const lineEl = container.querySelector(`[data-line="${t.coordinates.startLine}"]`) ?? container
-      console.log('[docs-review] thread %s: startLine=%d lineEl=%s text=%s',
-        t.id.slice(-6), t.coordinates.startLine, lineEl.tagName, t.coordinates.selectedText.slice(0, 30))
       const selected = t.id === selectedThreadId
       injectMark(
         lineEl,
@@ -180,8 +172,6 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     // Pending selection highlight — shown while popover or composer is visible.
     if (pending) {
       const lineEl = container.querySelector(`[data-line="${pending.coordinates.startLine}"]`) ?? container
-      console.log('[docs-review] pending: startLine=%d lineEl=%s text=%s',
-        pending.coordinates.startLine, lineEl.tagName, pending.coordinates.selectedText.slice(0, 30))
       injectMark(
         lineEl,
         pending.coordinates.selectedText,
