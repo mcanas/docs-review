@@ -52,7 +52,7 @@ export function useCreateThread(
     }) => {
       if (!restClient) throw new Error('Not authenticated')
       await ensureDocReviewLabel(restClient, owner, repo)
-      const title = buildDiscussionTitle(coordinates.file, coordinates.startLine, coordinates.endLine)
+      const title = buildDiscussionTitle(coordinates.file, coordinates.startLine, coordinates.endLine, coordinates.selectedText)
       const body = buildDiscussionBody(coordinates, comment)
       return createIssue(restClient, owner, repo, title, body)
     },

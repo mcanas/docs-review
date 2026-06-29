@@ -20,9 +20,11 @@ export function deserializeCoordinates(body: string): ThreadCoordinates | null {
   }
 }
 
-export function buildDiscussionTitle(file: string, startLine: number, endLine: number): string {
+export function buildDiscussionTitle(file: string, startLine: number, endLine: number, selectedText: string): string {
   const range = startLine === endLine ? `${startLine}` : `${startLine}-${endLine}`
-  return `[doc-review] ${file}:${range}`
+  const excerpt = selectedText.replace(/\s+/g, ' ').trim().slice(0, 60)
+  const suffix = excerpt.length < selectedText.replace(/\s+/g, ' ').trim().length ? '…' : ''
+  return `[doc-review] ${file}:${range} — "${excerpt}${suffix}"`
 }
 
 export function extractCommentBody(rawBody: string): string {
