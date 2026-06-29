@@ -118,7 +118,7 @@ export async function renderMarkdown(markdown: string): Promise<string> {
     .use(remarkRehype, { allowDangerousHtml: false })
     .use(rehypeLineNumbers)
     .use(rehypeMermaidPlaceholder)
-    .use(shikiPlugin)
+    .use(() => shikiPlugin)
     .use(rehypeSanitize, sanitizeSchema)
     .use(rehypeStringify)
     .process(markdown)
