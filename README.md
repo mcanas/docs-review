@@ -26,14 +26,13 @@ A GitHub-native markdown documentation review tool. Adds Confluence-style thread
 
 ### 1 — Register a GitHub OAuth App
 
-In your GitHub organisation (or GitHub Enterprise instance):
+In your GitHub org settings (**github.com → Your org → Settings → Developer settings → OAuth Apps → New OAuth App**):
 
-1. Go to **Settings → Developer settings → OAuth Apps → New OAuth App**
-2. Set **Application name**: `Docs Review`
-3. Set **Homepage URL**: your GitHub Pages URL (e.g. `https://your-org.github.io/your-repo`)
-4. Leave **Authorization callback URL** blank — Device Flow does not use a redirect
-5. Enable **Device Flow** under the OAuth App settings
-6. Note the **Client ID** (you do not need a client secret)
+1. Set **Application name**: `Docs Review`
+2. Set **Homepage URL**: your GitHub Pages URL (e.g. `https://your-org.github.io/your-repo`)
+3. Set **Authorization callback URL** to the same GitHub Pages URL — Device Flow doesn't use a redirect, but GitHub requires a non-blank value here
+4. Save, then enable **Device Flow** on the OAuth App's settings page
+5. Note the **Client ID** (you do not need a client secret)
 
 ### 2 — Add the config file
 
@@ -57,9 +56,11 @@ settings:
 
 Each `path` is relative to the repository root and scopes the file tree shown for that project.
 
-### 3 — Add the workflow
+### 3 — Fork this repository to your org
 
-Create `.github/workflows/docs-review.yml`:
+For enterprise use, fork `mcanas/docs-review` into your own GitHub organisation so your workflows depend on your org's copy rather than an external repo.
+
+Then create `.github/workflows/docs-review.yml` in the target documentation repository:
 
 ```yaml
 name: Deploy Docs Review
@@ -80,7 +81,7 @@ jobs:
       client-id: ${{ vars.DOCS_REVIEW_CLIENT_ID }}
 ```
 
-Replace `YOUR_ORG` with the organisation where this `docs-review` repository lives.
+Replace `YOUR_ORG` with the organisation where your forked `docs-review` repository lives.
 
 ### 4 — Set the repository variable
 
@@ -136,7 +137,7 @@ The sidebar project selector lets reviewers switch between projects without leav
 
 ## GitHub Enterprise
 
-**GitHub Enterprise Cloud (GHEC)** — no additional configuration. GHEC uses the same API and auth URLs as github.com (`api.github.com`, `github.com`). Register the OAuth App in your org's Settings → Developer Settings and follow the standard installation steps above.
+**GitHub Enterprise Cloud (GHEC)** — no additional configuration. GHEC uses the same API and auth URLs as github.com (`api.github.com`, `github.com`). Register the OAuth App in your org's Settings → Developer Settings and follow the standard installation steps above. If your org enforces SAML SSO, the GitHub Pages site will automatically be restricted to org members — only authenticated org members will be able to load the review interface.
 
 **GitHub Enterprise Server (GHES 3.1+)** — the build automatically picks up `VITE_GITHUB_API_URL` from the `github.api_url` context variable in GitHub Actions, which points to your instance's API (`https://github.your-company.com/api/v3`). Auth URLs are derived from it automatically. Ensure GitHub Pages is enabled at the instance level (Admin Console → Pages).
 
