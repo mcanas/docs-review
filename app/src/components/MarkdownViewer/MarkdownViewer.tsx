@@ -22,40 +22,46 @@ interface PendingSelection {
   selectionRect: DOMRect
 }
 
-// Walk text nodes inside `root` and wrap the first occurrence of `text`
-// in a <mark> element. Returns true if a match was found and wrapped.
-function injectMark(root: Element, text: string, threadId: string, closed: boolean, selected: boolean): boolean {
+// Inject a <mark> into `root` wrapping the first occurrence of `searchText`.
+// Uses only the first line of selectedText so multi-line selections still match.
+function injectMark(
+  root: Element,
+  selectedText: string,
+  attrs: { threadId?: string; pending?: true },
+  styles: { background: string; underlineColor: string },
+): boolean {
+  // Multi-line selections have \n; a single text node never does — use first line only.
+  const searchText = selectedText.split('\n')[0].trim()
+  if (!searchText) return false
+
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let node: Text | null
   while ((node = walker.nextNode() as Text | null)) {
     const val = node.nodeValue ?? ''
-    const idx = val.indexOf(text)
+    const idx = val.indexOf(searchText)
     if (idx === -1) continue
 
     const mark = document.createElement('mark')
-    mark.dataset.threadId = threadId
-    const bg = selected
-      ? 'rgba(253,224,71,0.6)'
-      : closed
-        ? 'rgba(156,163,175,0.12)'
-        : 'rgba(253,224,71,0.35)'
-    const underlineColor = closed ? '#9ca3af' : '#fbbf24'
-    mark.style.cssText = `background:${bg};border-radius:2px;cursor:pointer;text-decoration:underline;text-decoration-color:${underlineColor};text-decoration-thickness:2px;text-underline-offset:2px;`
-    mark.textContent = text
+    if (attrs.threadId) mark.dataset.threadId = attrs.threadId
+    if (attrs.pending) mark.dataset.pending = 'true'
+    mark.style.cssText = [
+      `background:${styles.background}`,
+      'border-radius:2px',
+      'cursor:pointer',
+      'text-decoration:underline',
+      `text-decoration-color:${styles.underlineColor}`,
+      'text-decoration-thickness:2px',
+      'text-underline-offset:2px',
+    ].join(';')
+    mark.textContent = searchText
 
     const parent = node.parentNode!
     const before = val.slice(0, idx)
-    const after = val.slice(idx + text.length)
-
-    if (before) {
-      parent.insertBefore(document.createTextNode(before), node)
-    }
+    const after = val.slice(idx + searchText.length)
+    if (before) parent.insertBefore(document.createTextNode(before), node)
     parent.insertBefore(mark, node)
-    if (after) {
-      node.nodeValue = after
-    } else {
-      parent.removeChild(node)
-    }
+    if (after) node.nodeValue = after
+    else parent.removeChild(node)
     return true
   }
   return false
@@ -67,6 +73,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
   const baseUrl = githubApiUrl !== 'https://api.github.com' ? githubApiUrl : undefined
 
   const containerRef = useRef<HTMLDivElement>(null)
+  const threadPanelRef = useRef<HTMLDivElement>(null)
   const [renderedHtml, setRenderedHtml] = useState('')
   const [sourceLines, setSourceLines] = useState<string[]>([])
   const [pending, setPending] = useState<PendingSelection | null>(null)
@@ -90,6 +97,14 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     setSourceLines(lines)
     renderMarkdown(fileContent.content).then(setRenderedHtml)
   }, [fileContent])
+
+  // Scroll thread panel to top whenever the composer opens or a thread is selected,
+  // so the new content is always visible regardless of prior scroll position.
+  useEffect(() => {
+    if (composerOpen || selectedThreadId) {
+      threadPanelRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [composerOpen, selectedThreadId])
 
   // Hydrate mermaid placeholder divs into SVGs after HTML renders.
   useLayoutEffect(() => {
@@ -117,22 +132,45 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     })
   }, [renderedHtml])
 
-  // Inject <mark> highlights for all threads after HTML renders or threads/selection changes.
+  // Inject <mark> highlights for threads and pending selection.
+  // Runs after every render that changes html, threads, selection, or pending state.
   useLayoutEffect(() => {
     if (!containerRef.current) return
 
-    // Clear previous marks (restore text nodes)
-    containerRef.current.querySelectorAll<HTMLElement>('mark[data-thread-id]').forEach((m) => {
-      m.replaceWith(document.createTextNode(m.textContent ?? ''))
+    // Clear all injected marks, restoring plain text nodes.
+    containerRef.current
+      .querySelectorAll<HTMLElement>('mark[data-thread-id], mark[data-pending]')
+      .forEach((m) => m.replaceWith(document.createTextNode(m.textContent ?? '')))
+
+    // Permanent thread highlights.
+    threads.forEach((t: ThreadType) => {
+      const lineEl = containerRef.current!.querySelector(`[data-line="${t.coordinates.startLine}"]`)
+      if (!lineEl) return
+      const selected = t.id === selectedThreadId
+      injectMark(
+        lineEl,
+        t.coordinates.selectedText,
+        { threadId: t.id },
+        {
+          background: selected ? 'rgba(253,224,71,0.6)' : t.closed ? 'rgba(156,163,175,0.12)' : 'rgba(253,224,71,0.35)',
+          underlineColor: t.closed ? '#9ca3af' : '#fbbf24',
+        },
+      )
     })
 
-    threads.forEach((t: ThreadType) => {
-      const { startLine, selectedText } = t.coordinates
-      if (!selectedText) return
-      const lineEl = containerRef.current!.querySelector(`[data-line="${startLine}"]`)
-      if (lineEl) injectMark(lineEl, selectedText, t.id, t.closed, t.id === selectedThreadId)
-    })
-  }, [renderedHtml, threads, selectedThreadId])
+    // Pending selection highlight — shown while popover or composer is visible.
+    if (pending) {
+      const lineEl = containerRef.current!.querySelector(`[data-line="${pending.coordinates.startLine}"]`)
+      if (lineEl) {
+        injectMark(
+          lineEl,
+          pending.coordinates.selectedText,
+          { pending: true },
+          { background: 'rgba(99,102,241,0.15)', underlineColor: '#818cf8' },
+        )
+      }
+    }
+  }, [renderedHtml, threads, selectedThreadId, pending])
 
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection()
@@ -148,6 +186,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
 
   const handleOpenComposer = () => {
     setComposerOpen(true)
+    // Clear browser selection — our pending mark provides the visual feedback instead.
     window.getSelection()?.removeAllRanges()
   }
 
@@ -228,7 +267,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
 
       {/* Thread panel — outer shell animates width */}
       <div className={`shrink-0 overflow-hidden transition-[width] duration-200 ${threadPanelOpen ? 'w-80' : 'w-0'}`}>
-        <div className="w-80 h-full py-8 px-4 space-y-4 overflow-y-auto">
+        <div ref={threadPanelRef} className="w-80 h-full py-8 px-4 space-y-4 overflow-y-auto">
           {/* New thread composer */}
           {composerOpen && pending && (
             <div className="space-y-2">
