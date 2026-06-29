@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useBuildConfig } from '../contexts/ConfigContext'
 import { useAuth } from '../contexts/AuthContext'
 import { useRepoTree } from '../hooks/useFileContent'
@@ -39,6 +39,8 @@ export function App() {
   const baseUrl = githubApiUrl !== 'https://api.github.com' ? githubApiUrl : undefined
 
   const { project: urlProject, file: urlFile, setProject, setFile } = useUrlParams()
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const toggleSidebar = useCallback(() => setSidebarOpen(v => !v), [])
 
   const defaultProject = config.config.settings?.default_project ?? config.config.projects[0]?.name ?? ''
   const [selectedProject, setSelectedProjectState] = useState(urlProject || defaultProject)
@@ -86,7 +88,7 @@ export function App() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-60 shrink-0 border-r border-gray-100 flex flex-col overflow-hidden">
+        <aside className={`shrink-0 border-r border-gray-100 flex flex-col overflow-hidden transition-[width] duration-200 ${sidebarOpen ? 'w-60' : 'w-0'}`}>
           <ProjectSelector
             projects={config.config.projects}
             selected={selectedProject}
@@ -109,6 +111,19 @@ export function App() {
             ) : null}
           </div>
         </aside>
+
+        {/* Sidebar toggle strip */}
+        <button
+          onClick={toggleSidebar}
+          className="shrink-0 w-4 flex items-center justify-center hover:bg-gray-50 text-gray-300 hover:text-gray-500 transition-colors border-r border-gray-100"
+          title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            {sidebarOpen
+              ? <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              : <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />}
+          </svg>
+        </button>
 
         {/* Main */}
         <main className="flex-1 overflow-auto">

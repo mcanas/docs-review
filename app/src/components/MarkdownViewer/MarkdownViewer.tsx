@@ -9,7 +9,7 @@ import { SelectionPopover } from './SelectionPopover'
 import { ThreadMarkerLayer } from './ThreadMarker'
 import { Thread } from '../CommentThread/Thread'
 import { ThreadComposer } from '../CommentThread/ThreadComposer'
-import type { ThreadCoordinates } from '../../types/thread'
+import type { Thread as ThreadType, ThreadCoordinates } from '../../types/thread'
 
 interface Props {
   filePath: string
@@ -20,7 +20,45 @@ interface Props {
 interface PendingSelection {
   coordinates: Omit<ThreadCoordinates, 'project' | 'file' | 'commitSha'>
   selectionRect: DOMRect
-  containerRect: DOMRect
+}
+
+// Walk text nodes inside `root` and wrap the first occurrence of `text`
+// in a <mark> element. Returns true if a match was found and wrapped.
+function injectMark(root: Element, text: string, threadId: string, closed: boolean, selected: boolean): boolean {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let node: Text | null
+  while ((node = walker.nextNode() as Text | null)) {
+    const val = node.nodeValue ?? ''
+    const idx = val.indexOf(text)
+    if (idx === -1) continue
+
+    const mark = document.createElement('mark')
+    mark.dataset.threadId = threadId
+    const bg = selected
+      ? 'rgba(253,224,71,0.6)'
+      : closed
+        ? 'rgba(156,163,175,0.12)'
+        : 'rgba(253,224,71,0.35)'
+    const underlineColor = closed ? '#9ca3af' : '#fbbf24'
+    mark.style.cssText = `background:${bg};border-radius:2px;cursor:pointer;text-decoration:underline;text-decoration-color:${underlineColor};text-decoration-thickness:2px;text-underline-offset:2px;`
+    mark.textContent = text
+
+    const parent = node.parentNode!
+    const before = val.slice(0, idx)
+    const after = val.slice(idx + text.length)
+
+    if (before) {
+      parent.insertBefore(document.createTextNode(before), node)
+    }
+    parent.insertBefore(mark, node)
+    if (after) {
+      node.nodeValue = after
+    } else {
+      parent.removeChild(node)
+    }
+    return true
+  }
+  return false
 }
 
 export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Props) {
@@ -34,6 +72,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
   const [pending, setPending] = useState<PendingSelection | null>(null)
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   const [composerOpen, setComposerOpen] = useState(false)
+  const [threadPanelOpen, setThreadPanelOpen] = useState(true)
 
   const { data: fileContent, isLoading: fileLoading } = useFileContent(
     repo.owner, repo.name, filePath, token, baseUrl,
@@ -52,8 +91,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     renderMarkdown(fileContent.content).then(setRenderedHtml)
   }, [fileContent])
 
-  // After each HTML update, hydrate any mermaid placeholder divs into SVGs.
-  // Mermaid is lazy-imported so it doesn't land in the initial bundle.
+  // Hydrate mermaid placeholder divs into SVGs after HTML renders.
   useLayoutEffect(() => {
     if (!renderedHtml || !containerRef.current) return
     const placeholders = containerRef.current.querySelectorAll<HTMLElement>('.mermaid-pending')
@@ -79,6 +117,23 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     })
   }, [renderedHtml])
 
+  // Inject <mark> highlights for all threads after HTML renders or threads/selection changes.
+  useLayoutEffect(() => {
+    if (!containerRef.current) return
+
+    // Clear previous marks (restore text nodes)
+    containerRef.current.querySelectorAll<HTMLElement>('mark[data-thread-id]').forEach((m) => {
+      m.replaceWith(document.createTextNode(m.textContent ?? ''))
+    })
+
+    threads.forEach((t: ThreadType) => {
+      const { startLine, selectedText } = t.coordinates
+      if (!selectedText) return
+      const lineEl = containerRef.current!.querySelector(`[data-line="${startLine}"]`)
+      if (lineEl) injectMark(lineEl, selectedText, t.id, t.closed, t.id === selectedThreadId)
+    })
+  }, [renderedHtml, threads, selectedThreadId])
+
   const handleMouseUp = useCallback(() => {
     const sel = window.getSelection()
     if (!sel || sel.isCollapsed || !containerRef.current) { setPending(null); return }
@@ -87,10 +142,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     if (!coords) { setPending(null); return }
 
     const range = sel.getRangeAt(0)
-    const selectionRect = range.getBoundingClientRect()
-    const containerRect = containerRef.current.getBoundingClientRect()
-
-    setPending({ coordinates: coords, selectionRect, containerRect })
+    setPending({ coordinates: coords, selectionRect: range.getBoundingClientRect() })
     setComposerOpen(false)
   }, [sourceLines])
 
@@ -112,6 +164,14 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
     setComposerOpen(false)
   }
 
+  // Event delegation: clicks on injected <mark> elements open the thread.
+  const handleContainerClick = useCallback((e: React.MouseEvent) => {
+    const mark = (e.target as Element).closest('mark[data-thread-id]') as HTMLElement | null
+    if (!mark) return
+    const threadId = mark.dataset.threadId
+    if (threadId) setSelectedThreadId(prev => prev === threadId ? null : threadId)
+  }, [])
+
   const selectedThread = threads.find((t) => t.id === selectedThreadId) ?? null
 
   if (fileLoading) {
@@ -123,7 +183,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
   }
 
   return (
-    <div className="flex gap-8 h-full">
+    <div className="flex h-full">
       {/* Main content column */}
       <div className="flex-1 min-w-0 relative pr-12">
         <div
@@ -131,24 +191,13 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
           className="relative prose prose-gray max-w-none py-8 px-6 select-text"
           dangerouslySetInnerHTML={{ __html: renderedHtml }}
           onMouseUp={handleMouseUp}
+          onClick={handleContainerClick}
         />
-
-        {/* Highlight threads in document via left-border accents */}
-        <style>{`
-          ${threads.map((t) => `
-            [data-line="${t.coordinates.startLine}"] {
-              border-left: 3px solid ${t.closed ? '#e5e7eb' : '#93c5fd'};
-              padding-left: 0.75rem;
-              margin-left: -0.75rem;
-            }
-          `).join('\n')}
-        `}</style>
 
         {/* Selection popover */}
         {pending && !composerOpen && (
           <SelectionPopover
             anchorRect={pending.selectionRect}
-            containerRect={pending.containerRect}
             onAddComment={handleOpenComposer}
           />
         )}
@@ -164,64 +213,80 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
         )}
       </div>
 
-      {/* Thread panel */}
-      <div className="w-80 shrink-0 py-8 space-y-4 overflow-y-auto">
-        {/* New thread composer */}
-        {composerOpen && pending && (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-gray-500">New comment</p>
-            <blockquote className="border-l-2 border-blue-300 pl-3 text-xs text-gray-500 italic line-clamp-2">
-              {pending.coordinates.selectedText}
-            </blockquote>
-            <ThreadComposer
-              onSubmit={handleCreateThread}
-              onCancel={() => { setPending(null); setComposerOpen(false) }}
-              submitLabel="Start thread"
+      {/* Thread panel toggle strip */}
+      <button
+        onClick={() => setThreadPanelOpen(v => !v)}
+        className="shrink-0 w-4 flex items-center justify-center border-l border-gray-100 hover:bg-gray-50 text-gray-300 hover:text-gray-500 transition-colors"
+        title={threadPanelOpen ? 'Collapse comments' : 'Expand comments'}
+      >
+        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          {threadPanelOpen
+            ? <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            : <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />}
+        </svg>
+      </button>
+
+      {/* Thread panel — outer shell animates width */}
+      <div className={`shrink-0 overflow-hidden transition-[width] duration-200 ${threadPanelOpen ? 'w-80' : 'w-0'}`}>
+        <div className="w-80 h-full py-8 px-4 space-y-4 overflow-y-auto">
+          {/* New thread composer */}
+          {composerOpen && pending && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-gray-500">New comment</p>
+              <blockquote className="border-l-2 border-blue-300 pl-3 text-xs text-gray-500 italic line-clamp-2">
+                {pending.coordinates.selectedText}
+              </blockquote>
+              <ThreadComposer
+                onSubmit={handleCreateThread}
+                onCancel={() => { setPending(null); setComposerOpen(false) }}
+                submitLabel="Start thread"
+              />
+            </div>
+          )}
+
+          {/* Selected thread */}
+          {selectedThread && (
+            <Thread
+              key={selectedThread.id}
+              thread={selectedThread}
+              isOutdated={selectedThread.coordinates.commitSha !== currentCommitSha}
+              onClose={() => setSelectedThreadId(null)}
+              onReply={(body) => addReply.mutateAsync({ discussionId: selectedThread.id, body })}
+              onResolve={() => resolveThread.mutateAsync({ discussionId: selectedThread.id, close: true })}
+              onReopen={() => resolveThread.mutateAsync({ discussionId: selectedThread.id, close: false })}
             />
-          </div>
-        )}
+          )}
 
-        {/* Selected thread */}
-        {selectedThread && (
-          <Thread
-            key={selectedThread.id}
-            thread={selectedThread}
-            isOutdated={selectedThread.coordinates.commitSha !== currentCommitSha}
-            onReply={(body) => addReply.mutateAsync({ discussionId: selectedThread.id, body })}
-            onResolve={() => resolveThread.mutateAsync({ discussionId: selectedThread.id, close: true })}
-            onReopen={() => resolveThread.mutateAsync({ discussionId: selectedThread.id, close: false })}
-          />
-        )}
+          {/* Thread list (when none selected) */}
+          {!selectedThread && !composerOpen && threads.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                {threads.filter((t) => !t.closed).length} open · {threads.filter((t) => t.closed).length} resolved
+              </p>
+              {threads.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setSelectedThreadId(t.id)}
+                  className="w-full text-left p-3 rounded-lg border border-gray-100 hover:border-gray-300 hover:shadow-sm transition-all"
+                >
+                  <p className="text-xs text-gray-500 italic line-clamp-2 mb-1">
+                    "{t.coordinates.selectedText}"
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {t.author.login} · {t.replies.length} {t.replies.length === 1 ? 'reply' : 'replies'}
+                    {t.closed && ' · Resolved'}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
 
-        {/* Thread list (when none selected) */}
-        {!selectedThread && !composerOpen && threads.length > 0 && (
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-              {threads.filter((t) => !t.closed).length} open · {threads.filter((t) => t.closed).length} resolved
+          {!selectedThread && !composerOpen && threads.length === 0 && (
+            <p className="text-xs text-gray-400">
+              Select text in the document to start a thread.
             </p>
-            {threads.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setSelectedThreadId(t.id)}
-                className="w-full text-left p-3 rounded-lg border border-gray-100 hover:border-gray-300 hover:shadow-sm transition-all"
-              >
-                <p className="text-xs text-gray-500 italic line-clamp-2 mb-1">
-                  "{t.coordinates.selectedText}"
-                </p>
-                <p className="text-xs text-gray-400">
-                  {t.author.login} · {t.replies.length} {t.replies.length === 1 ? 'reply' : 'replies'}
-                  {t.closed && ' · Resolved'}
-                </p>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {!selectedThread && !composerOpen && threads.length === 0 && (
-          <p className="text-xs text-gray-400">
-            Select text in the document to start a thread.
-          </p>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

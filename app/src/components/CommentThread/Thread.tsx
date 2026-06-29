@@ -19,12 +19,13 @@ function relativeTime(iso: string): string {
 interface Props {
   thread: ThreadType
   isOutdated: boolean
+  onClose: () => void
   onReply: (body: string) => Promise<void>
   onResolve: () => Promise<void>
   onReopen: () => Promise<void>
 }
 
-export function Thread({ thread, isOutdated, onReply, onResolve, onReopen }: Props) {
+export function Thread({ thread, isOutdated, onClose, onReply, onResolve, onReopen }: Props) {
   const { isAuthenticated } = useAuth()
   const [showReply, setShowReply] = useState(false)
   const [resolving, setResolving] = useState(false)
@@ -47,11 +48,16 @@ export function Thread({ thread, isOutdated, onReply, onResolve, onReopen }: Pro
     <div className={`rounded-xl border text-sm ${thread.closed ? 'border-gray-100 bg-gray-50' : 'border-gray-200 bg-white'} shadow-sm`}>
       {/* Quoted selection */}
       <div className="px-4 pt-3 pb-2 border-b border-gray-100">
-        {isOutdated && (
-          <span className="inline-block mb-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-            Outdated
-          </span>
-        )}
+        <div className="flex items-center gap-2 mb-2">
+          <button onClick={onClose} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+            ← Back
+          </button>
+          {isOutdated && (
+            <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+              Outdated
+            </span>
+          )}
+        </div>
         <blockquote className="border-l-2 border-gray-300 pl-3 text-xs text-gray-500 italic line-clamp-3">
           {thread.coordinates.selectedText}
         </blockquote>
