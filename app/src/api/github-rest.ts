@@ -52,6 +52,18 @@ export async function fetchDefaultBranchSha(client: Octokit, owner: string, repo
   return branchData.commit.sha
 }
 
+export async function ensureDocReviewLabel(
+  client: Octokit,
+  owner: string,
+  repo: string,
+): Promise<void> {
+  try {
+    await client.issues.createLabel({ owner, repo, name: 'doc-review', color: '0075ca', description: 'Doc review thread' })
+  } catch (e: any) {
+    if (e.status !== 422) throw e
+  }
+}
+
 export async function createIssue(
   client: Octokit,
   owner: string,

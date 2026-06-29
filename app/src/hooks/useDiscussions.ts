@@ -7,7 +7,7 @@ import {
   closeThread,
   reopenThread,
 } from '../api/github-graphql'
-import { createRestClient, createIssue } from '../api/github-rest'
+import { createRestClient, createIssue, ensureDocReviewLabel } from '../api/github-rest'
 import { buildDiscussionTitle, buildDiscussionBody } from '../utils/discussion'
 import type { ThreadCoordinates } from '../types/thread'
 
@@ -51,6 +51,7 @@ export function useCreateThread(
       comment: string
     }) => {
       if (!restClient) throw new Error('Not authenticated')
+      await ensureDocReviewLabel(restClient, owner, repo)
       const title = buildDiscussionTitle(coordinates.file, coordinates.startLine, coordinates.endLine)
       const body = buildDiscussionBody(coordinates, comment)
       return createIssue(restClient, owner, repo, title, body)
