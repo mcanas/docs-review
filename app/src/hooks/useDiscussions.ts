@@ -1,13 +1,13 @@
+import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   createGraphQLClient,
   fetchThreadsForFile,
-  createThread,
   addReply,
   closeThread,
   reopenThread,
-  fetchOrCreateDocReviewCategory,
 } from '../api/github-graphql'
+import { createRestClient, createIssue } from '../api/github-rest'
 import { buildDiscussionTitle, buildDiscussionBody } from '../utils/discussion'
 import type { ThreadCoordinates } from '../types/thread'
 
@@ -39,7 +39,8 @@ export function useCreateThread(
   githubApiUrl: string,
 ) {
   const queryClient = useQueryClient()
-  const client = useGraphQL(token, githubApiUrl)
+  const baseUrl = githubApiUrl !== 'https://api.github.com' ? githubApiUrl : undefined
+  const restClient = useMemo(() => (token ? createRestClient(token, baseUrl) : null), [token, baseUrl])
 
   return useMutation({
     mutationFn: async ({
@@ -49,11 +50,10 @@ export function useCreateThread(
       coordinates: ThreadCoordinates
       comment: string
     }) => {
-      if (!client) throw new Error('Not authenticated')
-      const { repositoryId, categoryId } = await fetchOrCreateDocReviewCategory(client, owner, repo)
+      if (!restClient) throw new Error('Not authenticated')
       const title = buildDiscussionTitle(coordinates.file, coordinates.startLine, coordinates.endLine)
       const body = buildDiscussionBody(coordinates, comment)
-      return createThread(client, repositoryId, categoryId, title, body)
+      return createIssue(restClient, owner, repo, title, body)
     },
     onSuccess: (_, { coordinates }) => {
       queryClient.invalidateQueries({ queryKey: ['threads', owner, repo, coordinates.file] })

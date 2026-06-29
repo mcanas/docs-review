@@ -82,109 +82,50 @@ export async function fetchThreadsForFile(
   const query = `
     query($owner: String!, $repo: String!, $label: String!) {
       repository(owner: $owner, name: $repo) {
-        discussions(first: 100, labels: [$label], orderBy: { field: CREATED_AT, direction: ASC }) {
+        issues(first: 100, labels: [$label], states: [OPEN, CLOSED], orderBy: { field: CREATED_AT, direction: ASC }) {
           nodes { ${THREAD_FIELDS} }
         }
       }
     }
   `
   const result = await client<{
-    repository: { discussions: { nodes: RawDiscussion[] } }
+    repository: { issues: { nodes: RawDiscussion[] } }
   }>(query, { owner, repo, label: 'doc-review' })
 
-  return result.repository.discussions.nodes
+  return result.repository.issues.nodes
     .map(mapDiscussion)
     .filter((t): t is Thread => t !== null && t.coordinates.file === filePath)
 }
 
-export async function createThread(
-  client: ReturnType<typeof createGraphQLClient>,
-  repositoryId: string,
-  categoryId: string,
-  title: string,
-  body: string,
-): Promise<Thread> {
-  const mutation = `
-    mutation($input: CreateDiscussionInput!) {
-      createDiscussion(input: $input) {
-        discussion { ${THREAD_FIELDS} }
-      }
-    }
-  `
-  const result = await client<{
-    createDiscussion: { discussion: RawDiscussion }
-  }>(mutation, {
-    input: { repositoryId, categoryId, title, body },
-  })
-
-  const thread = mapDiscussion(result.createDiscussion.discussion)
-  if (!thread) throw new Error('Failed to parse created thread')
-  return thread
-}
-
 export async function addReply(
   client: ReturnType<typeof createGraphQLClient>,
-  discussionId: string,
+  subjectId: string,
   body: string,
 ): Promise<void> {
   const mutation = `
-    mutation($input: AddDiscussionCommentInput!) {
-      addDiscussionComment(input: $input) { comment { id } }
+    mutation($subjectId: ID!, $body: String!) {
+      addComment(input: { subjectId: $subjectId, body: $body }) { commentEdge { node { id } } }
     }
   `
-  await client(mutation, { input: { discussionId, body } })
+  await client(mutation, { subjectId, body })
 }
 
 export async function closeThread(
   client: ReturnType<typeof createGraphQLClient>,
-  discussionId: string,
+  issueId: string,
 ): Promise<void> {
   const mutation = `
-    mutation($id: ID!) { closeDiscussion(input: { discussionId: $id }) { discussion { id } } }
+    mutation($id: ID!) { closeIssue(input: { issueId: $id }) { issue { id } } }
   `
-  await client(mutation, { id: discussionId })
+  await client(mutation, { id: issueId })
 }
 
 export async function reopenThread(
   client: ReturnType<typeof createGraphQLClient>,
-  discussionId: string,
+  issueId: string,
 ): Promise<void> {
   const mutation = `
-    mutation($id: ID!) { reopenDiscussion(input: { discussionId: $id }) { discussion { id } } }
+    mutation($id: ID!) { reopenIssue(input: { issueId: $id }) { issue { id } } }
   `
-  await client(mutation, { id: discussionId })
-}
-
-export async function fetchOrCreateDocReviewCategory(
-  client: ReturnType<typeof createGraphQLClient>,
-  owner: string,
-  repo: string,
-): Promise<{ repositoryId: string; categoryId: string }> {
-  const query = `
-    query($owner: String!, $repo: String!) {
-      repository(owner: $owner, name: $repo) {
-        id
-        discussionCategories(first: 20) {
-          nodes { id name }
-        }
-      }
-    }
-  `
-  const result = await client<{
-    repository: { id: string; discussionCategories: { nodes: Array<{ id: string; name: string }> } }
-  }>(query, { owner, repo })
-
-  const categories = result.repository.discussionCategories.nodes
-  const category =
-    categories.find((c) => c.name === '📝 Doc Reviews') ??
-    categories.find((c) => c.name.toLowerCase().includes('general')) ??
-    categories[0]
-
-  if (!category) {
-    throw new Error(
-      'No discussion categories found. Enable Discussions on the repository and create a category (e.g. "General") in the GitHub settings UI.',
-    )
-  }
-
-  return { repositoryId: result.repository.id, categoryId: category.id }
+  await client(mutation, { id: issueId })
 }

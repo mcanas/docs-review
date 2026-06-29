@@ -1,5 +1,7 @@
 import { Octokit } from '@octokit/rest'
 import type { GitHubFileContent, GitHubTreeItem, GitHubUser } from '../types/github'
+import type { Thread } from '../types/thread'
+import { deserializeCoordinates } from '../utils/discussion'
 
 export function createRestClient(token: string, baseUrl?: string): Octokit {
   return new Octokit({ auth: token, baseUrl })
@@ -48,4 +50,30 @@ export async function fetchDefaultBranchSha(client: Octokit, owner: string, repo
   const branch = repoData.default_branch
   const { data: branchData } = await client.repos.getBranch({ owner, repo, branch })
   return branchData.commit.sha
+}
+
+export async function createIssue(
+  client: Octokit,
+  owner: string,
+  repo: string,
+  title: string,
+  body: string,
+): Promise<Thread> {
+  const { data } = await client.issues.create({ owner, repo, title, body, labels: ['doc-review'] })
+  return {
+    id: data.node_id,
+    number: data.number,
+    title: data.title,
+    body: data.body ?? '',
+    closed: data.state === 'closed',
+    author: {
+      login: data.user?.login ?? '',
+      avatarUrl: data.user?.avatar_url ?? '',
+      url: data.user?.html_url ?? '',
+    },
+    createdAt: data.created_at,
+    coordinates: deserializeCoordinates(data.body ?? '')!,
+    replies: [],
+    reactionGroups: [],
+  }
 }

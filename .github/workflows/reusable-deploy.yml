@@ -23,7 +23,6 @@ jobs:
       contents: write   # needed to push to gh-pages branch
       pages: write
       id-token: write
-      discussions: write
 
     steps:
       - name: Checkout calling repo
@@ -64,50 +63,16 @@ jobs:
           print(f"Config valid: {len(projects)} project(s)")
           EOF
 
-      - name: Setup Discussions category
+      - name: Setup doc-review label
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          OWNER="${{ github.repository_owner }}"
-          REPO="${{ github.event.repository.name }}"
-
-          gh api --method PATCH "repos/$OWNER/$REPO" -f has_discussions=true --silent || true
-
-          RESPONSE=$(gh api graphql -f query='
-            query($owner:String!,$repo:String!){
-              repository(owner:$owner,name:$repo){
-                id
-                discussionCategories(first:20){ nodes{ id name } }
-              }
-            }
-          ' -f owner="$OWNER" -f repo="$REPO")
-
-          REPO_ID=$(echo "$RESPONSE" | jq -r '.data.repository.id')
-          EXISTING_ID=$(echo "$RESPONSE" | jq -r '
-            .data.repository.discussionCategories.nodes[]
-            | select(.name=="📝 Doc Reviews") | .id' 2>/dev/null || echo "")
-
-          if [ -n "$EXISTING_ID" ]; then
-            echo "Discussion category already exists (id=$EXISTING_ID)"
-            exit 0
-          fi
-
-          gh api graphql --input - <<EOF
-          {
-            "query": "mutation(\$input: CreateDiscussionCategoryInput!) { createDiscussionCategory(input: \$input) { discussionCategory { id name } } }",
-            "variables": {
-              "input": {
-                "repositoryId": "$REPO_ID",
-                "name": "📝 Doc Reviews",
-                "emoji": ":memo:",
-                "description": "Review threads created by docs-review",
-                "format": "OPEN_ENDED"
-              }
-            }
-          }
-          EOF
-          echo "Created '📝 Doc Reviews' discussion category"
+          gh label create "doc-review" \
+            --repo "${{ github.repository }}" \
+            --color "0075ca" \
+            --description "Doc review thread" \
+            --force
 
       - name: Inject build config
         run: |
