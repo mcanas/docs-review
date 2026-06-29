@@ -1,6 +1,7 @@
 export interface ProjectConfig {
   name: string
-  path: string
+  docs_path: string
+  label?: string
   description?: string
 }
 

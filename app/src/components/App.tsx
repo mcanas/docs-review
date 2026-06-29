@@ -98,7 +98,7 @@ export function App() {
             ) : treeData && projectConfig ? (
               <FileTree
                 items={treeData.items}
-                projectPath={projectConfig.path}
+                projectPath={projectConfig.docs_path}
                 selectedFile={urlFile}
                 onSelect={setFile}
                 threads={allThreads}
