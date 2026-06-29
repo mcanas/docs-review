@@ -99,9 +99,53 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
 
   useEffect(() => {
     if (!fileContent) return
-    const lines = extractSourceLines(fileContent.content)
-    setSourceLines(lines)
-    renderMarkdown(fileContent.content).then(setRenderedHtml)
+    let cancelled = false
+
+    setSourceLines(extractSourceLines(fileContent.content))
+    ;(async () => {
+      const html = await renderMarkdown(fileContent.content)
+      if (cancelled) return
+      // Show content immediately with placeholder divs so the page isn't blank
+      // while mermaid diagrams render.
+      setRenderedHtml(html)
+
+      // Render mermaid diagrams into an off-DOM DOMParser document, then bake
+      // the SVG strings into the HTML before the second setRenderedHtml call.
+      // Doing it this way avoids the async-vs-React-commit race where el.innerHTML
+      // targets a detached node (happens when renderedHtml changes between when
+      // the useLayoutEffect captures element references and when mermaid resolves).
+      const temp = new DOMParser().parseFromString(html, 'text/html')
+      const placeholders = Array.from(temp.querySelectorAll<HTMLElement>('.mermaid-pending'))
+      if (!placeholders.length || cancelled) return
+
+      const { default: mermaid } = await import('mermaid')
+      if (cancelled) return
+      mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
+
+      await Promise.all(
+        placeholders.map(async (el, i) => {
+          const encoded = el.getAttribute('data-mermaid')
+          if (!encoded) return
+          try {
+            const source = new TextDecoder().decode(
+              Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0)),
+            )
+            const { svg } = await mermaid.render(`mermaid-${i}`, source)
+            const wrapper = temp.createElement('div')
+            wrapper.innerHTML = svg
+            el.replaceWith(...Array.from(wrapper.childNodes))
+          } catch (err) {
+            el.textContent = `Diagram error: ${err instanceof Error ? err.message : String(err)}`
+            el.removeAttribute('data-mermaid')
+            el.className = 'text-red-500 text-sm font-mono p-3 bg-red-50 rounded'
+          }
+        }),
+      )
+
+      if (!cancelled) setRenderedHtml(temp.body.innerHTML)
+    })()
+
+    return () => { cancelled = true }
   }, [fileContent])
 
   // Scroll thread panel to top whenever the composer opens or a thread is selected,
@@ -111,34 +155,6 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
       threadPanelRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }, [composerOpen, selectedThreadId])
-
-  // Hydrate mermaid placeholder divs into SVGs after HTML renders.
-  useLayoutEffect(() => {
-    if (!renderedHtml || !containerRef.current) return
-    const placeholders = containerRef.current.querySelectorAll<HTMLElement>('.mermaid-pending')
-    if (!placeholders.length) return
-
-    import('mermaid').then(({ default: mermaid }) => {
-      mermaid.initialize({ startOnLoad: false, theme: 'neutral' })
-      placeholders.forEach(async (el, i) => {
-        const encoded = el.getAttribute('data-mermaid')
-        if (!encoded) return
-        try {
-          // TextDecoder handles the full UTF-8 range safely (escape() is deprecated)
-          const source = new TextDecoder().decode(Uint8Array.from(atob(encoded), c => c.charCodeAt(0)))
-          const id = `mermaid-diagram-${i}`
-          const { svg, bindFunctions } = await mermaid.render(id, source)
-          el.innerHTML = svg
-          bindFunctions?.(el)
-          el.classList.remove('mermaid-pending')
-        } catch (err) {
-          el.textContent = `Diagram error: ${err instanceof Error ? err.message : String(err)}`
-          el.classList.add('text-red-500', 'text-sm', 'font-mono', 'p-3', 'bg-red-50', 'rounded')
-          el.classList.remove('mermaid-pending')
-        }
-      })
-    }).catch((err) => console.error('[docs-review] mermaid import failed:', err))
-  }, [renderedHtml])
 
   // Inject <mark> highlights for threads and pending selection.
   // Runs after every render that changes html, threads, selection, or pending state.

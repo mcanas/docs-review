@@ -28,8 +28,10 @@ export async function fetchFileContent(
   if (Array.isArray(data) || data.type !== 'file') {
     throw new Error(`${path} is not a file`)
   }
+  const binary = atob(data.content.replace(/\n/g, ''))
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
   return {
-    content: atob(data.content.replace(/\n/g, '')),
+    content: new TextDecoder().decode(bytes),
     sha: data.sha,
     path: data.path,
   }
