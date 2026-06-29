@@ -45,6 +45,7 @@ const baseThread: ThreadType = {
 const defaultProps = {
   thread: baseThread,
   isOutdated: false,
+  onClose: vi.fn(),
   onReply: vi.fn().mockResolvedValue(undefined),
   onResolve: vi.fn().mockResolvedValue(undefined),
   onReopen: vi.fn().mockResolvedValue(undefined),

@@ -41,14 +41,28 @@ describe('serializeCoordinates / deserializeCoordinates', () => {
 })
 
 describe('buildDiscussionTitle', () => {
-  it('formats as [doc-review] path:start-end', () => {
-    expect(buildDiscussionTitle('projects/platform/docs/design.md', 42, 44)).toBe(
-      '[doc-review] projects/platform/docs/design.md:42-44',
+  it('formats as [doc-review] path:start-end — "excerpt"', () => {
+    expect(buildDiscussionTitle('projects/platform/docs/design.md', 42, 44, 'the authentication flow')).toBe(
+      '[doc-review] projects/platform/docs/design.md:42-44 — "the authentication flow"',
     )
   })
 
-  it('handles single-line selections (start === end)', () => {
-    expect(buildDiscussionTitle('docs/spec.md', 10, 10)).toBe('[doc-review] docs/spec.md:10-10')
+  it('omits end line for single-line selections', () => {
+    expect(buildDiscussionTitle('docs/spec.md', 10, 10, 'the selected text')).toBe(
+      '[doc-review] docs/spec.md:10 — "the selected text"',
+    )
+  })
+
+  it('truncates excerpt at 60 chars with ellipsis', () => {
+    const long = 'a'.repeat(70)
+    const title = buildDiscussionTitle('docs/spec.md', 1, 1, long)
+    expect(title).toContain('…"')
+    expect(title).toContain('"' + 'a'.repeat(60) + '…"')
+  })
+
+  it('collapses whitespace in excerpt', () => {
+    const title = buildDiscussionTitle('docs/spec.md', 1, 1, 'foo\n  bar\tbaz')
+    expect(title).toContain('"foo bar baz"')
   })
 })
 
