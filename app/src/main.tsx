@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ConfigProvider } from './contexts/ConfigContext'
 import { AuthProvider } from './contexts/AuthContext'
 import { useConfig } from './hooks/useConfig'
+import { App } from './components/App'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -24,7 +25,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <ConfigProvider>
         <Providers>
-          <div>Docs Review — coming soon</div>
+          <App />
         </Providers>
       </ConfigProvider>
     </QueryClientProvider>
