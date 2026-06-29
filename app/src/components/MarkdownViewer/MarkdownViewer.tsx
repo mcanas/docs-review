@@ -22,47 +22,53 @@ interface PendingSelection {
   selectionRect: DOMRect
 }
 
-// Inject a <mark> into `root` wrapping the first occurrence of `searchText`.
-// Uses only the first line of selectedText so multi-line selections still match.
+// Inject a <mark> into `root` wrapping the first occurrence of a search string.
+// Tries the full first line of selectedText first; falls back to the first word
+// so that cross-element selections (e.g. text spanning <strong>) still get a mark.
 function injectMark(
   root: Element,
   selectedText: string,
   attrs: { threadId?: string; pending?: true },
   styles: { background: string; underlineColor: string },
 ): boolean {
-  // Multi-line selections have \n; a single text node never does — use first line only.
-  const searchText = selectedText.split('\n')[0].trim()
-  if (!searchText) return false
+  const firstLine = selectedText.split('\n')[0].trim()
+  if (!firstLine) return false
 
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-  let node: Text | null
-  while ((node = walker.nextNode() as Text | null)) {
-    const val = node.nodeValue ?? ''
-    const idx = val.indexOf(searchText)
-    if (idx === -1) continue
+  // Candidates: try longest match first so the most accurate anchor wins.
+  const firstWord = firstLine.split(/\s+/)[0]
+  const candidates = firstWord !== firstLine ? [firstLine, firstWord] : [firstLine]
 
-    const mark = document.createElement('mark')
-    if (attrs.threadId) mark.dataset.threadId = attrs.threadId
-    if (attrs.pending) mark.dataset.pending = 'true'
-    mark.style.cssText = [
-      `background:${styles.background}`,
-      'border-radius:2px',
-      'cursor:pointer',
-      'text-decoration:underline',
-      `text-decoration-color:${styles.underlineColor}`,
-      'text-decoration-thickness:2px',
-      'text-underline-offset:2px',
-    ].join(';')
-    mark.textContent = searchText
+  for (const searchText of candidates) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    let node: Text | null
+    while ((node = walker.nextNode() as Text | null)) {
+      const val = node.nodeValue ?? ''
+      const idx = val.indexOf(searchText)
+      if (idx === -1) continue
 
-    const parent = node.parentNode!
-    const before = val.slice(0, idx)
-    const after = val.slice(idx + searchText.length)
-    if (before) parent.insertBefore(document.createTextNode(before), node)
-    parent.insertBefore(mark, node)
-    if (after) node.nodeValue = after
-    else parent.removeChild(node)
-    return true
+      const mark = document.createElement('mark')
+      if (attrs.threadId) mark.dataset.threadId = attrs.threadId
+      if (attrs.pending) mark.dataset.pending = 'true'
+      mark.style.cssText = [
+        `background:${styles.background}`,
+        'border-radius:2px',
+        'cursor:pointer',
+        'text-decoration:underline',
+        `text-decoration-color:${styles.underlineColor}`,
+        'text-decoration-thickness:2px',
+        'text-underline-offset:2px',
+      ].join(';')
+      mark.textContent = searchText
+
+      const parent = node.parentNode!
+      const before = val.slice(0, idx)
+      const after = val.slice(idx + searchText.length)
+      if (before) parent.insertBefore(document.createTextNode(before), node)
+      parent.insertBefore(mark, node)
+      if (after) node.nodeValue = after
+      else parent.removeChild(node)
+      return true
+    }
   }
   return false
 }
@@ -222,9 +228,9 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full overflow-hidden">
       {/* Main content column */}
-      <div className="flex-1 min-w-0 relative pr-12">
+      <div className="flex-1 min-w-0 relative pr-12 overflow-y-auto">
         <div
           ref={containerRef}
           className="relative prose prose-gray max-w-none py-8 px-6 select-text"
@@ -288,7 +294,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
             <Thread
               key={selectedThread.id}
               thread={selectedThread}
-              isOutdated={selectedThread.coordinates.commitSha !== currentCommitSha}
+              isOutdated={!!currentCommitSha && selectedThread.coordinates.commitSha !== currentCommitSha}
               onClose={() => setSelectedThreadId(null)}
               onReply={(body) => addReply.mutateAsync({ discussionId: selectedThread.id, body })}
               onResolve={() => resolveThread.mutateAsync({ discussionId: selectedThread.id, close: true })}

@@ -66,7 +66,7 @@ const sanitizeSchema = {
   ...defaultSchema,
   attributes: {
     ...defaultSchema.attributes,
-    '*': [...(defaultSchema.attributes?.['*'] ?? []), /^data-/],
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), /^data/],
     code: [...(defaultSchema.attributes?.['code'] ?? []), 'className'],
     span: [...(defaultSchema.attributes?.['span'] ?? []), 'className', 'style'],
     div: [...(defaultSchema.attributes?.['div'] ?? []), 'className', 'dataMermaid'],
