@@ -26,6 +26,8 @@ export function extractSelectionCoordinates(
   return { selectedText, startLine, endLine, sectionContext }
 }
 
+const BLOCK_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre', 'td', 'th', 'dt', 'dd'])
+
 function findSourceLine(
   el: Element | null,
   container: HTMLElement,
@@ -35,10 +37,17 @@ function findSourceLine(
 ): number {
   if (!el || !container.contains(el)) return 0
 
-  const textContent = el.textContent ?? ''
+  // Walk up to the nearest block element — inline elements like <strong>/<code>
+  // have very short textContent that can ambiguously match the wrong source line.
+  let block: Element = el
+  while (!BLOCK_TAGS.has(block.tagName.toLowerCase()) && block.parentElement && block.parentElement !== container) {
+    block = block.parentElement
+  }
+
+  const textContent = block.textContent ?? ''
   const firstWord = selectedText.split(/\s+/)[0]
 
-  const lineIndex = sourceLines.findIndex((line) => line.includes(firstWord) && line.includes(textContent.slice(0, 20)))
+  const lineIndex = sourceLines.findIndex((line) => line.includes(firstWord) && line.includes(textContent.slice(0, 40)))
   return lineIndex === -1 ? 0 : lineIndex + 1
 }
 

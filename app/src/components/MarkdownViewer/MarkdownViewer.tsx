@@ -143,15 +143,22 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
   useLayoutEffect(() => {
     if (!containerRef.current) return
 
+    const container = containerRef.current
+    const dataLineCount = container.querySelectorAll('[data-line]').length
+    console.debug('[docs-review] mark effect: threads=%d data-line-els=%d', threads.length, dataLineCount)
+
     // Clear all injected marks, restoring plain text nodes.
-    containerRef.current
+    container
       .querySelectorAll<HTMLElement>('mark[data-thread-id], mark[data-pending]')
       .forEach((m) => m.replaceWith(document.createTextNode(m.textContent ?? '')))
 
     // Permanent thread highlights.
+    // Falls back to searching the whole container when startLine is 0 or the
+    // element can't be found (e.g. threads created before data-line fix).
     threads.forEach((t: ThreadType) => {
-      const lineEl = containerRef.current!.querySelector(`[data-line="${t.coordinates.startLine}"]`)
-      if (!lineEl) return
+      const lineEl = container.querySelector(`[data-line="${t.coordinates.startLine}"]`) ?? container
+      console.debug('[docs-review] thread %s: startLine=%d lineEl=%s text=%s',
+        t.id.slice(-6), t.coordinates.startLine, lineEl.tagName, t.coordinates.selectedText.slice(0, 30))
       const selected = t.id === selectedThreadId
       injectMark(
         lineEl,
@@ -166,15 +173,15 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
 
     // Pending selection highlight — shown while popover or composer is visible.
     if (pending) {
-      const lineEl = containerRef.current!.querySelector(`[data-line="${pending.coordinates.startLine}"]`)
-      if (lineEl) {
-        injectMark(
-          lineEl,
-          pending.coordinates.selectedText,
-          { pending: true },
-          { background: 'rgba(99,102,241,0.15)', underlineColor: '#818cf8' },
-        )
-      }
+      const lineEl = container.querySelector(`[data-line="${pending.coordinates.startLine}"]`) ?? container
+      console.debug('[docs-review] pending: startLine=%d lineEl=%s text=%s',
+        pending.coordinates.startLine, lineEl.tagName, pending.coordinates.selectedText.slice(0, 30))
+      injectMark(
+        lineEl,
+        pending.coordinates.selectedText,
+        { pending: true },
+        { background: 'rgba(99,102,241,0.15)', underlineColor: '#818cf8' },
+      )
     }
   }, [renderedHtml, threads, selectedThreadId, pending])
 
