@@ -136,9 +136,9 @@ The sidebar project selector lets reviewers switch between projects without leav
 
 ## GitHub Enterprise
 
-Docs Review works on GitHub Enterprise Server (GHES 3.1+). No additional configuration is required — the build picks up `VITE_GITHUB_API_URL` automatically from the `github.api_url` context variable in GitHub Actions.
+**GitHub Enterprise Cloud (GHEC)** — no additional configuration. GHEC uses the same API and auth URLs as github.com (`api.github.com`, `github.com`). Register the OAuth App in your org's Settings → Developer Settings and follow the standard installation steps above.
 
-Ensure GitHub Pages is enabled at the instance level (Admin Console → Pages).
+**GitHub Enterprise Server (GHES 3.1+)** — the build automatically picks up `VITE_GITHUB_API_URL` from the `github.api_url` context variable in GitHub Actions, which points to your instance's API (`https://github.your-company.com/api/v3`). Auth URLs are derived from it automatically. Ensure GitHub Pages is enabled at the instance level (Admin Console → Pages).
 
 ---
 

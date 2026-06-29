@@ -30,11 +30,15 @@ export function useGitHubAuth(clientId: string, githubApiUrl: string) {
   const [user, setUser] = useState<GitHubUser | null>(null)
 
   const baseUrl = githubApiUrl !== 'https://api.github.com' ? githubApiUrl : undefined
+  // GHEC and github.com both use api.github.com; only GHES has a custom hostname with /api/v3
+  const authBaseUrl = githubApiUrl.endsWith('/api/v3')
+    ? githubApiUrl.slice(0, -7)
+    : 'https://github.com'
 
   const initAuth = useCallback(async () => {
     setState({ status: 'idle' })
 
-    const deviceRes = await fetch(`${githubApiUrl.replace('/api/v3', '')}/login/device/code`, {
+    const deviceRes = await fetch(`${authBaseUrl}/login/device/code`, {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ client_id: clientId, scope: 'repo' }),
@@ -56,7 +60,7 @@ export function useGitHubAuth(clientId: string, githubApiUrl: string) {
         return
       }
 
-      const tokenRes = await fetch(`${githubApiUrl.replace('/api/v3', '')}/login/oauth/access_token`, {
+      const tokenRes = await fetch(`${authBaseUrl}/login/oauth/access_token`, {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
