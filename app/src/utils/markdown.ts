@@ -88,6 +88,7 @@ const LANGS = [
   () => import('shiki/langs/rust.mjs'),
   () => import('shiki/langs/java.mjs'),
   () => import('shiki/langs/markdown.mjs'),
+  () => import('shiki/langs/graphql.mjs'),
 ]
 
 let highlighterPromise: ReturnType<typeof createHighlighterCore> | null = null
