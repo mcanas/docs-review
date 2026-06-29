@@ -40,7 +40,7 @@ export function App() {
 
   const { project: urlProject, file: urlFile, setProject, setFile } = useUrlParams()
 
-  const defaultProject = config.config.settings.default_project ?? config.config.projects[0]?.name ?? ''
+  const defaultProject = config.config.settings?.default_project ?? config.config.projects[0]?.name ?? ''
   const [selectedProject, setSelectedProjectState] = useState(urlProject || defaultProject)
 
   const projectConfig = config.config.projects.find((p) => p.name === selectedProject)

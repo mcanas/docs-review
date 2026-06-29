@@ -13,9 +13,11 @@ function injectBuildConfig(): Plugin {
       const githubApiUrl = process.env.VITE_GITHUB_API_URL ?? 'https://api.github.com'
       const rawConfig = process.env.VITE_DOCS_CONFIG ?? ''
 
-      let config = { projects: [], settings: { file_extensions: ['.md'], exclude: [] } }
+      const defaultConfig = { projects: [], settings: { file_extensions: ['.md'], exclude: [] } }
+      let config = defaultConfig
       try {
-        config = rawConfig ? parseYaml(rawConfig) : config
+        const parsed = rawConfig ? parseYaml(rawConfig) : {}
+        config = { ...defaultConfig, ...parsed, settings: { ...defaultConfig.settings, ...(parsed.settings ?? {}) } }
       } catch {
         // fall back to empty config in dev
       }
