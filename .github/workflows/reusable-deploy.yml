@@ -1,0 +1,75 @@
+name: Docs Review — Reusable Deploy
+
+on:
+  workflow_call:
+    inputs:
+      config-path:
+        description: Path to docs-review.config.yml in the calling repo
+        type: string
+        default: docs-review.config.yml
+      node-version:
+        description: Node.js version to use for the build
+        type: string
+        default: '20'
+    secrets:
+      client-id:
+        description: GitHub OAuth App Client ID
+        required: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to push to gh-pages branch
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout calling repo
+        uses: actions/checkout@v4
+
+      - name: Checkout docs-review tool
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/docs-review
+          path: .docs-review-tool
+          # pin to a release tag in production usage
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: .docs-review-tool/app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: .docs-review-tool/app
+
+      - name: Validate config
+        run: |
+          npx ajv validate \
+            -s .docs-review-tool/docs-review.config.schema.json \
+            -d ${{ inputs.config-path }}
+
+      - name: Inject build config
+        env:
+          VITE_REPO_OWNER: ${{ github.repository_owner }}
+          VITE_REPO_NAME: ${{ github.event.repository.name }}
+          VITE_OAUTH_CLIENT_ID: ${{ secrets.client-id }}
+          VITE_GITHUB_API_URL: ${{ github.api_url }}
+        run: |
+          CONFIG_CONTENT=$(cat ${{ github.workspace }}/${{ inputs.config-path }})
+          echo "VITE_DOCS_CONFIG<<EOF" >> $GITHUB_ENV
+          echo "$CONFIG_CONTENT" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Build
+        run: npm run build
+        working-directory: .docs-review-tool/app
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .docs-review-tool/app/dist

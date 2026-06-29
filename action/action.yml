@@ -1,0 +1,54 @@
+name: Docs Review
+description: Build and deploy the Docs Review markdown commenting interface to GitHub Pages
+author: docs-review
+
+inputs:
+  config-path:
+    description: Path to docs-review.config.yml relative to the repo root
+    required: false
+    default: docs-review.config.yml
+  client-id:
+    description: GitHub OAuth App Client ID
+    required: true
+  node-version:
+    description: Node.js version for the build
+    required: false
+    default: '20'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+        cache-dependency-path: ${{ github.action_path }}/../app/package-lock.json
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+      working-directory: ${{ github.action_path }}/../app
+
+    - name: Validate config
+      shell: bash
+      run: |
+        npx ajv validate \
+          -s ${{ github.action_path }}/../docs-review.config.schema.json \
+          -d ${{ inputs.config-path }}
+
+    - name: Build
+      shell: bash
+      env:
+        VITE_REPO_OWNER: ${{ github.repository_owner }}
+        VITE_REPO_NAME: ${{ github.event.repository.name }}
+        VITE_OAUTH_CLIENT_ID: ${{ inputs.client-id }}
+        VITE_GITHUB_API_URL: ${{ github.api_url }}
+      run: npm run build
+      working-directory: ${{ github.action_path }}/../app
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ github.token }}
+        publish_dir: ${{ github.action_path }}/../app/dist
