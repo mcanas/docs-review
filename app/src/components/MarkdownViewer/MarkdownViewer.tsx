@@ -105,7 +105,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
       ...pending.coordinates,
       project: projectName,
       file: filePath,
-      commitSha: fileContent.sha,
+      commitSha: currentCommitSha,
     }
     await createThread.mutateAsync({ coordinates, comment: body })
     setPending(null)
