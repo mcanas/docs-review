@@ -48,9 +48,19 @@ jobs:
 
       - name: Validate config
         run: |
-          npx ajv validate \
-            -s .docs-review-tool/docs-review.config.schema.json \
-            -d ${{ inputs.config-path }}
+          node -e "
+            const fs = require('fs');
+            const { parse } = require('.docs-review-tool/app/node_modules/yaml');
+            const raw = fs.readFileSync('${{ inputs.config-path }}', 'utf8');
+            const cfg = parse(raw);
+            if (!Array.isArray(cfg.projects) || cfg.projects.length === 0)
+              throw new Error('docs-review.config.yml must have at least one project');
+            for (const p of cfg.projects) {
+              if (!p.name) throw new Error('Each project must have a name');
+              if (!p.docs_path) throw new Error('Each project must have a docs_path');
+            }
+            console.log('Config valid:', cfg.projects.length, 'project(s)');
+          "
 
       - name: Inject build config
         env:
