@@ -1,6 +1,6 @@
 # Docs Review
 
-A GitHub-native markdown documentation review tool. Adds Confluence-style threaded inline commenting to any markdown repository, served via GitHub Pages with all content and commentary stored in GitHub Discussions. No external services required.
+A GitHub-native markdown documentation review tool. Adds Confluence-style threaded inline commenting to any markdown repository, served via GitHub Pages with all content and commentary stored as GitHub Issues. No external services required.
 
 ---
 
@@ -8,7 +8,7 @@ A GitHub-native markdown documentation review tool. Adds Confluence-style thread
 
 - Documents are written and committed as markdown files — no change to author workflow
 - Reviewers open the GitHub Pages site, select text in the rendered document, and add comment threads
-- Comments are stored as GitHub Discussions in the same repository
+- Comments are stored as GitHub Issues in the same repository
 - GitHub's native notification system alerts participants
 - All content stays in GitHub
 
@@ -20,21 +20,12 @@ A GitHub-native markdown documentation review tool. Adds Confluence-style thread
 
 | Requirement | Notes |
 |---|---|
-| GitHub Discussions enabled | Repo Settings → Features → Discussions |
 | GitHub Pages enabled | Repo Settings → Pages → Source: `gh-pages` branch |
-| GitHub OAuth App | Register in your org/GHE instance with Device Flow enabled |
+| GitHub Issues enabled | Enabled by default on all repositories |
 
-### 1 — Register a GitHub OAuth App
+**Authentication** uses GitHub Personal Access Tokens — no OAuth App registration needed. Visitors can browse and read without signing in; signing in is only required to post or reply to comments.
 
-In your GitHub org settings (**github.com → Your org → Settings → Developer settings → OAuth Apps → New OAuth App**):
-
-1. Set **Application name**: `Docs Review`
-2. Set **Homepage URL**: your GitHub Pages URL (e.g. `https://your-org.github.io/your-repo`)
-3. Set **Authorization callback URL** to the same GitHub Pages URL — Device Flow doesn't use a redirect, but GitHub requires a non-blank value here
-4. Save, then enable **Device Flow** on the OAuth App's settings page
-5. Note the **Client ID** (you do not need a client secret)
-
-### 2 — Add the config file
+### 1 — Add the config file
 
 Create `docs-review.config.yml` in the root of your repository:
 
@@ -55,6 +46,18 @@ settings:
 ```
 
 Each `path` is relative to the repository root and scopes the file tree shown for that project.
+
+### 2 — Create a read-only PAT
+
+This token lets unauthenticated visitors browse docs and read threads without signing in.
+
+Go to **github.com → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**:
+
+- **Resource owner**: the org (or account) that owns the docs repo
+- **Repository access**: only the target docs repo
+- **Permissions**: Contents → Read-only; Issues → Read-only
+
+Copy the generated token — you'll add it as a secret in step 4.
 
 ### 3 — Fork this repository to your org
 
@@ -78,17 +81,17 @@ jobs:
     with:
       config-path: 'docs-review.config.yml'
     secrets:
-      client-id: ${{ vars.DOCS_REVIEW_CLIENT_ID }}
+      read-token: ${{ secrets.DOCS_REVIEW_READ_TOKEN }}
 ```
 
 Replace `YOUR_ORG` with the organisation where your forked `docs-review` repository lives.
 
-### 4 — Set the repository variable
+### 4 — Add the secret
 
-In your repository: **Settings → Secrets and variables → Actions → Variables → New repository variable**
+In your repository: **Settings → Secrets and variables → Actions → Secrets → New repository secret**
 
-- **Name**: `DOCS_REVIEW_CLIENT_ID`
-- **Value**: the Client ID from step 1
+- **Name**: `DOCS_REVIEW_READ_TOKEN`
+- **Value**: the fine-grained PAT from step 2
 
 ### 5 — Deploy
 
@@ -100,9 +103,9 @@ The site will be available at `https://YOUR_ORG.github.io/YOUR_REPO` (or your GH
 
 ## Reviewer workflow
 
-1. Open the GitHub Pages URL
-2. Click **Sign in** — you'll see a short device code; visit the displayed URL and enter it in your GitHub account
-3. Select a project from the sidebar, then select a document
+1. Open the GitHub Pages URL — no sign-in required to browse docs and read existing threads
+2. Select a project from the sidebar, then select a document
+3. To comment: click **Sign in** in the top-right, enter your GitHub Personal Access Token, click **Sign in**
 4. Highlight any text in the rendered document → click **Add comment**
 5. Write your comment (markdown supported) → **Start thread**
 6. Other reviewers can reply, resolve, or reopen threads
@@ -137,15 +140,15 @@ The sidebar project selector lets reviewers switch between projects without leav
 
 ## GitHub Enterprise
 
-**GitHub Enterprise Cloud (GHEC)** — no additional configuration. GHEC uses the same API and auth URLs as github.com (`api.github.com`, `github.com`). Register the OAuth App in your org's Settings → Developer Settings and follow the standard installation steps above. If your org enforces SAML SSO, the GitHub Pages site will automatically be restricted to org members — only authenticated org members will be able to load the review interface.
+**GitHub Enterprise Cloud (GHEC)** — no additional configuration. GHEC uses the same API and auth URLs as github.com (`api.github.com`, `github.com`). Follow the standard installation steps above. If your org enforces SAML SSO, the GitHub Pages site will automatically be restricted to org members.
 
-**GitHub Enterprise Server (GHES 3.1+)** — the build automatically picks up `VITE_GITHUB_API_URL` from the `github.api_url` context variable in GitHub Actions, which points to your instance's API (`https://github.your-company.com/api/v3`). Auth URLs are derived from it automatically. Ensure GitHub Pages is enabled at the instance level (Admin Console → Pages).
+**GitHub Enterprise Server (GHES 3.1+)** — the build automatically picks up `VITE_GITHUB_API_URL` from the `github.api_url` context variable in GitHub Actions, which points to your instance's API (`https://github.your-company.com/api/v3`). Ensure GitHub Pages is enabled at the instance level (Admin Console → Pages).
 
 ---
 
 ## Comment storage
 
-Comments are stored as GitHub Discussions in the `📝 Doc Reviews` category (created automatically on first use). Each thread is labelled `doc-review` to keep it isolated from other Discussions. Deleting a thread closes the Discussion and removes the inline annotation.
+Comments are stored as GitHub Issues labelled `doc-review`, keeping them isolated from regular issues. Thread coordinates (file, line range, selected text, commit SHA) are stored in the issue body so threads stay anchored to the correct location even as the document evolves.
 
 ---
 
@@ -164,8 +167,8 @@ To test against a real repository locally, create `app/.env.local`:
 ```env
 VITE_REPO_OWNER=your-org
 VITE_REPO_NAME=your-repo
-VITE_OAUTH_CLIENT_ID=your-client-id
 VITE_GITHUB_API_URL=https://api.github.com
+VITE_READ_TOKEN=your_read_only_pat
 VITE_DOCS_CONFIG=|
   projects:
     - name: "My Docs"

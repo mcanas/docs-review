@@ -15,6 +15,7 @@ interface Props {
   filePath: string
   projectName: string
   currentCommitSha: string
+  openSignIn: () => void
 }
 
 interface PendingSelection {
@@ -73,9 +74,10 @@ function injectMark(
   return false
 }
 
-export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Props) {
-  const { token } = useAuth()
-  const { repo, githubApiUrl } = useBuildConfig()
+export function MarkdownViewer({ filePath, projectName, currentCommitSha, openSignIn }: Props) {
+  const { token, isAuthenticated } = useAuth()
+  const { repo, githubApiUrl, readToken } = useBuildConfig()
+  const effectiveToken = token ?? (readToken || null)
   const baseUrl = githubApiUrl !== 'https://api.github.com' ? githubApiUrl : undefined
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -89,10 +91,10 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
   const [lineFilter, setLineFilter] = useState<number | null>(null)
 
   const { data: fileContent, isLoading: fileLoading } = useFileContent(
-    repo.owner, repo.name, filePath, token, baseUrl,
+    repo.owner, repo.name, filePath, effectiveToken, baseUrl,
   )
   const { data: threads = [] } = useThreads(
-    repo.owner, repo.name, filePath, token, githubApiUrl,
+    repo.owner, repo.name, filePath, effectiveToken, githubApiUrl,
   )
   const createThread = useCreateThread(repo.owner, repo.name, token, githubApiUrl)
   const addReply = useAddReply(repo.owner, repo.name, filePath, token, githubApiUrl)
@@ -211,6 +213,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
   }, [sourceLines])
 
   const handleOpenComposer = () => {
+    if (!isAuthenticated) { openSignIn(); return }
     setComposerOpen(true)
     // Clear browser selection — our pending mark provides the visual feedback instead.
     window.getSelection()?.removeAllRanges()
@@ -278,6 +281,8 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
           <SelectionPopover
             anchorRect={pending.selectionRect}
             onAddComment={handleOpenComposer}
+            isAuthenticated={isAuthenticated}
+            onSignIn={openSignIn}
           />
         )}
 
@@ -333,6 +338,7 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha }: Prop
               onReply={(body) => addReply.mutateAsync({ discussionId: selectedThread.id, body })}
               onResolve={() => resolveThread.mutateAsync({ discussionId: selectedThread.id, close: true })}
               onReopen={() => resolveThread.mutateAsync({ discussionId: selectedThread.id, close: false })}
+              onSignIn={openSignIn}
             />
           )}
 

@@ -13,8 +13,11 @@ on:
         default: '20'
     secrets:
       client-id:
-        description: GitHub OAuth App Client ID
-        required: true
+        description: GitHub OAuth App Client ID (reserved for future OAuth support)
+        required: false
+      read-token:
+        description: Read-only PAT for unauthenticated browsing (Contents + Issues read)
+        required: false
 
 jobs:
   build-and-deploy:
@@ -58,8 +61,8 @@ jobs:
           for p in projects:
               if not p.get("name"):
                   sys.exit("Each project must have a name")
-              if not p.get("docs_path"):
-                  sys.exit("Each project must have a docs_path")
+              if not p.get("path"):
+                  sys.exit("Each project must have a path")
           print(f"Config valid: {len(projects)} project(s)")
           EOF
 
@@ -69,6 +72,7 @@ jobs:
           echo "VITE_REPO_NAME=${{ github.event.repository.name }}" >> $GITHUB_ENV
           echo "VITE_OAUTH_CLIENT_ID=${{ secrets.client-id }}" >> $GITHUB_ENV
           echo "VITE_GITHUB_API_URL=${{ github.api_url }}" >> $GITHUB_ENV
+          echo "VITE_READ_TOKEN=${{ secrets.read-token }}" >> $GITHUB_ENV
           CONFIG_CONTENT=$(cat ${{ github.workspace }}/${{ inputs.config-path }})
           echo "VITE_DOCS_CONFIG<<EOF" >> $GITHUB_ENV
           echo "$CONFIG_CONTENT" >> $GITHUB_ENV

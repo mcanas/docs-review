@@ -49,6 +49,7 @@ const defaultProps = {
   onReply: vi.fn().mockResolvedValue(undefined),
   onResolve: vi.fn().mockResolvedValue(undefined),
   onReopen: vi.fn().mockResolvedValue(undefined),
+  onSignIn: vi.fn(),
 }
 
 beforeEach(() => {

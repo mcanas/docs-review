@@ -1,6 +1,6 @@
 export interface ProjectConfig {
   name: string
-  docs_path: string
+  path: string
   label?: string
   description?: string
 }
@@ -21,5 +21,6 @@ export interface BuildConfig {
   }
   oauthClientId: string
   githubApiUrl: string
+  readToken: string
   config: DocsReviewConfig
 }

@@ -6,6 +6,7 @@ import { useThreads } from '../hooks/useDiscussions'
 import { ProjectSelector } from './Sidebar/ProjectSelector'
 import { FileTree } from './Sidebar/FileTree'
 import { UserMenu } from './Auth/UserMenu'
+import { DeviceFlowModal } from './Auth/DeviceFlowModal'
 import { MarkdownViewer } from './MarkdownViewer/MarkdownViewer'
 
 function useUrlParams() {
@@ -35,11 +36,14 @@ function useUrlParams() {
 export function App() {
   const config = useBuildConfig()
   const { token, githubApiUrl } = { ...useAuth(), githubApiUrl: useBuildConfig().githubApiUrl }
-  const { repo } = config
+  const { repo, readToken } = config
+  const effectiveToken = token ?? (readToken || null)
   const baseUrl = githubApiUrl !== 'https://api.github.com' ? githubApiUrl : undefined
 
   const { project: urlProject, file: urlFile, setProject, setFile } = useUrlParams()
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [showSignIn, setShowSignIn] = useState(false)
+  const openSignIn = useCallback(() => setShowSignIn(true), [])
   const toggleSidebar = useCallback(() => setSidebarOpen(v => !v), [])
 
   const defaultProject = config.config.settings?.default_project ?? config.config.projects[0]?.name ?? ''
@@ -53,11 +57,11 @@ export function App() {
   }
 
   const { data: treeData, isLoading: treeLoading } = useRepoTree(
-    repo.owner, repo.name, token, baseUrl,
+    repo.owner, repo.name, effectiveToken, baseUrl,
   )
 
   const { data: allThreads = [] } = useThreads(
-    repo.owner, repo.name, urlFile, token, githubApiUrl,
+    repo.owner, repo.name, urlFile, effectiveToken, githubApiUrl,
   )
 
   useEffect(() => {
@@ -100,13 +104,13 @@ export function App() {
             ) : treeData && projectConfig ? (
               <FileTree
                 items={treeData.items}
-                projectPath={projectConfig.docs_path}
+                projectPath={projectConfig.path}
                 selectedFile={urlFile}
                 onSelect={setFile}
                 threads={allThreads}
                 extensions={config.config.settings.file_extensions}
               />
-            ) : !token ? (
+            ) : !effectiveToken ? (
               <p className="px-3 py-4 text-xs text-gray-400">Sign in to browse files.</p>
             ) : null}
           </div>
@@ -132,6 +136,7 @@ export function App() {
               filePath={urlFile}
               projectName={selectedProject}
               currentCommitSha={currentSha}
+              openSignIn={openSignIn}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3">
@@ -143,6 +148,8 @@ export function App() {
           )}
         </main>
       </div>
+
+      {showSignIn && <DeviceFlowModal onClose={() => setShowSignIn(false)} />}
     </div>
   )
 }

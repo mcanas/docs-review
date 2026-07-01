@@ -23,9 +23,10 @@ interface Props {
   onReply: (body: string) => Promise<void>
   onResolve: () => Promise<void>
   onReopen: () => Promise<void>
+  onSignIn: () => void
 }
 
-export function Thread({ thread, isOutdated, onClose, onReply, onResolve, onReopen }: Props) {
+export function Thread({ thread, isOutdated, onClose, onReply, onResolve, onReopen, onSignIn }: Props) {
   const { isAuthenticated } = useAuth()
   const [showReply, setShowReply] = useState(false)
   const [resolving, setResolving] = useState(false)
@@ -101,10 +102,10 @@ export function Thread({ thread, isOutdated, onClose, onReply, onResolve, onReop
         {/* Actions */}
         <div className="py-3 flex items-center justify-between border-t border-gray-100">
           <button
-            onClick={() => setShowReply((v) => !v)}
+            onClick={() => isAuthenticated ? setShowReply((v) => !v) : onSignIn()}
             className="text-xs text-gray-500 hover:text-blue-600"
           >
-            {showReply ? 'Cancel' : 'Reply'}
+            {showReply ? 'Cancel' : isAuthenticated ? 'Reply' : 'Sign in to reply'}
           </button>
           {isAuthenticated && (
             <button

@@ -19,6 +19,7 @@ vi.mock('../../contexts/ConfigContext', () => ({
     repo: { owner: 'my-org', name: 'my-repo' },
     oauthClientId: 'client-id',
     githubApiUrl: 'https://api.github.com',
+    readToken: '',
     config: { projects: [], settings: { file_extensions: ['.md'], exclude: [] } },
   })),
 }))
@@ -49,6 +50,7 @@ const defaultProps = {
   filePath: 'docs/spec.md',
   projectName: 'Platform Core',
   currentCommitSha: 'abc123',
+  openSignIn: vi.fn(),
 }
 
 beforeEach(() => {
