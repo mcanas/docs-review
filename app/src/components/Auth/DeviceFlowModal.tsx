@@ -21,14 +21,17 @@ export function DeviceFlowModal({ onClose }: { onClose: () => void }) {
         <p className="text-sm text-gray-600">
           Enter a GitHub{' '}
           <a
-            href="https://github.com/settings/tokens/new?scopes=repo&description=docs-review"
+            href="https://github.com/settings/personal-access-tokens/new"
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 underline"
           >
-            Personal Access Token
+            fine-grained Personal Access Token
           </a>{' '}
-          with <code className="bg-gray-100 px-1 rounded text-xs">repo</code> scope.
+          scoped to this repo with{' '}
+          <strong className="font-medium text-gray-800">Issues: Read and Write</strong>{' '}
+          and{' '}
+          <strong className="font-medium text-gray-800">Contents: Read-only</strong>.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
@@ -36,7 +39,7 @@ export function DeviceFlowModal({ onClose }: { onClose: () => void }) {
             type="password"
             value={pat}
             onChange={(e) => setPat(e.target.value)}
-            placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+            placeholder="github_pat_xxxxxxxxxxxxxxxxxxxx"
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 font-mono"
             autoFocus
           />

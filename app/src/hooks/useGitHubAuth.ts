@@ -33,7 +33,7 @@ export function useGitHubAuth(_clientId: string, githubApiUrl: string) {
       setUser(fetchedUser)
       setState({ status: 'authenticated', token: tokenToUse, user: fetchedUser })
     } catch {
-      setState({ status: 'error', message: 'Invalid token or insufficient permissions. Make sure the token has repo scope.' })
+      setState({ status: 'error', message: 'Invalid token or insufficient permissions. Token needs Issues: Read and Write + Contents: Read-only.' })
     }
   }, [githubApiUrl, baseUrl, storedToken])
 
