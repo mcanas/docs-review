@@ -36,8 +36,7 @@ function useUrlParams() {
 export function App() {
   const config = useBuildConfig()
   const { token, githubApiUrl } = { ...useAuth(), githubApiUrl: useBuildConfig().githubApiUrl }
-  const { repo, readToken } = config
-  const effectiveToken = token ?? (readToken || null)
+  const { repo } = config
   const baseUrl = githubApiUrl !== 'https://api.github.com' ? githubApiUrl : undefined
 
   const { project: urlProject, file: urlFile, setProject, setFile } = useUrlParams()
@@ -56,12 +55,12 @@ export function App() {
     setProject(name)
   }
 
-  const { data: treeData, isLoading: treeLoading } = useRepoTree(
-    repo.owner, repo.name, effectiveToken, baseUrl,
+  const { data: treeData, isLoading: treeLoading, isError: treeError } = useRepoTree(
+    repo.owner, repo.name, token, baseUrl,
   )
 
   const { data: allThreads = [] } = useThreads(
-    repo.owner, repo.name, urlFile, effectiveToken, githubApiUrl,
+    repo.owner, repo.name, urlFile, token, githubApiUrl,
   )
 
   useEffect(() => {
@@ -110,8 +109,10 @@ export function App() {
                 threads={allThreads}
                 extensions={config.config.settings.file_extensions}
               />
-            ) : !effectiveToken ? (
-              <p className="px-3 py-4 text-xs text-gray-400">Sign in to browse files.</p>
+            ) : treeError ? (
+              <p className="px-3 py-4 text-xs text-gray-400">
+                {!token ? 'Sign in to browse this private repository.' : 'Error loading files.'}
+              </p>
             ) : null}
           </div>
         </aside>

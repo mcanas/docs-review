@@ -11,7 +11,6 @@ function injectBuildConfig(): Plugin {
       const name = process.env.VITE_REPO_NAME ?? 'repo'
       const oauthClientId = process.env.VITE_OAUTH_CLIENT_ID ?? ''
       const githubApiUrl = process.env.VITE_GITHUB_API_URL ?? 'https://api.github.com'
-      const readToken = process.env.VITE_READ_TOKEN ?? ''
       const rawConfig = process.env.VITE_DOCS_CONFIG ?? ''
 
       const defaultConfig = { projects: [], settings: { file_extensions: ['.md'], exclude: [] } }
@@ -27,7 +26,6 @@ function injectBuildConfig(): Plugin {
         repo: { owner, name },
         oauthClientId,
         githubApiUrl,
-        readToken,
         config,
       })}</script>`
 

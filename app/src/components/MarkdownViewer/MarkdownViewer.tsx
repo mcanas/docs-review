@@ -76,8 +76,7 @@ function injectMark(
 
 export function MarkdownViewer({ filePath, projectName, currentCommitSha, openSignIn }: Props) {
   const { token, isAuthenticated } = useAuth()
-  const { repo, githubApiUrl, readToken } = useBuildConfig()
-  const effectiveToken = token ?? (readToken || null)
+  const { repo, githubApiUrl } = useBuildConfig()
   const baseUrl = githubApiUrl !== 'https://api.github.com' ? githubApiUrl : undefined
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -91,10 +90,10 @@ export function MarkdownViewer({ filePath, projectName, currentCommitSha, openSi
   const [lineFilter, setLineFilter] = useState<number | null>(null)
 
   const { data: fileContent, isLoading: fileLoading } = useFileContent(
-    repo.owner, repo.name, filePath, effectiveToken, baseUrl,
+    repo.owner, repo.name, filePath, token, baseUrl,
   )
   const { data: threads = [] } = useThreads(
-    repo.owner, repo.name, filePath, effectiveToken, githubApiUrl,
+    repo.owner, repo.name, filePath, token, githubApiUrl,
   )
   const createThread = useCreateThread(repo.owner, repo.name, token, githubApiUrl)
   const addReply = useAddReply(repo.owner, repo.name, filePath, token, githubApiUrl)

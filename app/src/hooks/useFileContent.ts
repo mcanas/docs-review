@@ -11,7 +11,7 @@ export function useFileContent(
 ) {
   return useQuery({
     queryKey: ['file', owner, repo, path, token],
-    enabled: !!path && !!token,
+    enabled: !!path,
     queryFn: async () => {
       const client = createRestClient(token!, baseUrl)
       return fetchFileContent(client, owner, repo, path)
@@ -27,7 +27,7 @@ export function useRepoTree(
 ) {
   return useQuery({
     queryKey: ['tree', owner, repo, token],
-    enabled: !!token,
+    enabled: true,
     queryFn: async () => {
       const client = createRestClient(token!, baseUrl)
       const sha = await fetchDefaultBranchSha(client, owner, repo)

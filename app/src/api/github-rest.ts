@@ -1,10 +1,10 @@
 import { Octokit } from '@octokit/rest'
 import type { GitHubFileContent, GitHubTreeItem, GitHubUser } from '../types/github'
-import type { Thread } from '../types/thread'
+import type { Thread, ReactionGroup } from '../types/thread'
 import { deserializeCoordinates } from '../utils/discussion'
 
-export function createRestClient(token: string, baseUrl?: string): Octokit {
-  return new Octokit({ auth: token, baseUrl })
+export function createRestClient(token: string | null, baseUrl?: string): Octokit {
+  return new Octokit({ ...(token ? { auth: token } : {}), baseUrl })
 }
 
 export async function fetchUser(client: Octokit): Promise<GitHubUser> {
@@ -64,6 +64,57 @@ export async function ensureDocReviewLabel(
   } catch (e: any) {
     if (e.status !== 422) throw e
   }
+}
+
+export async function fetchThreadsForFile(
+  client: Octokit,
+  owner: string,
+  repo: string,
+  filePath: string,
+): Promise<Thread[]> {
+  const { data: issues } = await client.issues.listForRepo({
+    owner, repo, labels: 'doc-review', state: 'all', per_page: 100,
+  })
+
+  const threads = await Promise.all(
+    issues.map(async (issue) => {
+      const coordinates = deserializeCoordinates(issue.body ?? '')
+      if (!coordinates || coordinates.file !== filePath) return null
+
+      const { data: comments } = await client.issues.listComments({
+        owner, repo, issue_number: issue.number, per_page: 100,
+      })
+
+      return {
+        id: issue.node_id,
+        number: issue.number,
+        title: issue.title,
+        body: issue.body ?? '',
+        closed: issue.state === 'closed',
+        author: {
+          login: issue.user?.login ?? '',
+          avatarUrl: issue.user?.avatar_url ?? '',
+          url: issue.user?.html_url ?? '',
+        },
+        createdAt: issue.created_at,
+        coordinates,
+        replies: comments.map((c) => ({
+          id: c.node_id,
+          body: c.body ?? '',
+          author: {
+            login: c.user?.login ?? '',
+            avatarUrl: c.user?.avatar_url ?? '',
+            url: c.user?.html_url ?? '',
+          },
+          createdAt: c.created_at,
+          reactionGroups: [] as ReactionGroup[],
+        })),
+        reactionGroups: [] as ReactionGroup[],
+      } satisfies Thread
+    }),
+  )
+
+  return threads.filter((t): t is Thread => t !== null)
 }
 
 export async function createIssue(

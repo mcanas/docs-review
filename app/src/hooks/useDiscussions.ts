@@ -2,12 +2,11 @@ import { useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   createGraphQLClient,
-  fetchThreadsForFile,
   addReply,
   closeThread,
   reopenThread,
 } from '../api/github-graphql'
-import { createRestClient, createIssue, ensureDocReviewLabel } from '../api/github-rest'
+import { createRestClient, createIssue, ensureDocReviewLabel, fetchThreadsForFile } from '../api/github-rest'
 import { buildDiscussionTitle, buildDiscussionBody } from '../utils/discussion'
 import type { ThreadCoordinates } from '../types/thread'
 
@@ -24,11 +23,12 @@ export function useThreads(
   token: string | null,
   githubApiUrl: string,
 ) {
-  const client = useGraphQL(token, githubApiUrl)
+  const baseUrl = githubApiUrl !== 'https://api.github.com' ? githubApiUrl : undefined
+  const client = useMemo(() => createRestClient(token, baseUrl), [token, baseUrl])
   return useQuery({
     queryKey: ['threads', owner, repo, filePath, token],
-    enabled: !!client && !!filePath,
-    queryFn: () => fetchThreadsForFile(client!, owner, repo, filePath),
+    enabled: !!filePath,
+    queryFn: () => fetchThreadsForFile(client, owner, repo, filePath),
   })
 }
 

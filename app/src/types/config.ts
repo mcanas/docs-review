@@ -21,6 +21,5 @@ export interface BuildConfig {
   }
   oauthClientId: string
   githubApiUrl: string
-  readToken: string
   config: DocsReviewConfig
 }

@@ -19,7 +19,6 @@ vi.mock('../../contexts/ConfigContext', () => ({
     repo: { owner: 'my-org', name: 'my-repo' },
     oauthClientId: 'client-id',
     githubApiUrl: 'https://api.github.com',
-    readToken: '',
     config: { projects: [], settings: { file_extensions: ['.md'], exclude: [] } },
   })),
 }))
